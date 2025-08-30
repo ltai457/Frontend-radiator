@@ -1,7 +1,7 @@
 // src/api/customerService.js
 import axios from 'axios';
 
-const API_BASE_URL = 'http://localhost:5128/api/v1';
+const API_BASE_URL = import.meta.env.VITE_API_BASE || 'http://localhost:5128/api/v1';
 
 // Create axios instance with auth interceptor
 const api = axios.create({
@@ -73,7 +73,7 @@ const customerService = {
     }
   },
 
-  // Delete/deactivate customer (Admin only)
+  // Delete (deactivate) customer (Admin only)
   async delete(id) {
     try {
       await api.delete(`/customers/${id}`);
@@ -86,10 +86,10 @@ const customerService = {
     }
   },
 
-  // Get customer's purchase history
-  async getSalesHistory(id) {
+  // Get customer's sales history
+  async getSalesHistory(customerId) {
     try {
-      const response = await api.get(`/customers/${id}/sales`);
+      const response = await api.get(`/customers/${customerId}/sales`);
       return { success: true, data: response.data };
     } catch (error) {
       return { 

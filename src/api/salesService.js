@@ -1,7 +1,7 @@
 // src/api/salesService.js
 import axios from 'axios';
 
-const API_BASE_URL = 'http://localhost:5128/api/v1';
+const API_BASE_URL = import.meta.env.VITE_API_BASE || 'http://localhost:5128/api/v1';
 
 // Create axios instance with auth interceptor
 const api = axios.create({
@@ -21,6 +21,19 @@ api.interceptors.request.use((config) => {
 });
 
 const salesService = {
+  // Create a new sale
+  async create(saleData) {
+    try {
+      const response = await api.post('/sales', saleData);
+      return { success: true, data: response.data };
+    } catch (error) {
+      return { 
+        success: false, 
+        error: error.response?.data?.message || 'Failed to create sale' 
+      };
+    }
+  },
+
   // Get all sales
   async getAll() {
     try {
@@ -47,38 +60,27 @@ const salesService = {
     }
   },
 
-  // Create new sale
-  async create(saleData) {
-    try {
-      const response = await api.post('/sales', saleData);
-      return { success: true, data: response.data };
-    } catch (error) {
-      return { 
-        success: false, 
-        error: error.response?.data?.message || 'Failed to create sale' 
-      };
-    }
-  },
-
   // Get sales by date range
   async getByDateRange(fromDate, toDate) {
     try {
-      const response = await api.get('/sales/by-date', {
-        params: { fromDate, toDate }
+      const params = new URLSearchParams({
+        fromDate: fromDate.toISOString(),
+        toDate: toDate.toISOString()
       });
+      const response = await api.get(`/sales/by-date?${params}`);
       return { success: true, data: response.data };
     } catch (error) {
       return { 
         success: false, 
-        error: error.response?.data?.message || 'Failed to fetch sales by date' 
+        error: error.response?.data?.message || 'Failed to fetch sales by date range' 
       };
     }
   },
 
   // Get receipt for a sale
-  async getReceipt(id) {
+  async getReceipt(saleId) {
     try {
-      const response = await api.get(`/sales/${id}/receipt`);
+      const response = await api.get(`/sales/${saleId}/receipt`);
       return { success: true, data: response.data };
     } catch (error) {
       return { 
@@ -88,10 +90,10 @@ const salesService = {
     }
   },
 
-  // Cancel sale (Admin only)
-  async cancel(id) {
+  // Cancel a sale (Admin only)
+  async cancel(saleId) {
     try {
-      const response = await api.post(`/sales/${id}/cancel`);
+      const response = await api.post(`/sales/${saleId}/cancel`);
       return { success: true, data: response.data };
     } catch (error) {
       return { 
@@ -101,10 +103,10 @@ const salesService = {
     }
   },
 
-  // Refund sale (Admin only) - Restores stock levels
-  async refund(id) {
+  // Refund a sale (Admin only)
+  async refund(saleId) {
     try {
-      const response = await api.post(`/sales/${id}/refund`);
+      const response = await api.post(`/sales/${saleId}/refund`);
       return { success: true, data: response.data };
     } catch (error) {
       return { 
