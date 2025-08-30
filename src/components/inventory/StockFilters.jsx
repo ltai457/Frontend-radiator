@@ -1,4 +1,5 @@
 import React from 'react';
+import { AlertTriangle } from 'lucide-react';
 import { SearchInput } from '../common/ui/SearchInput';
 import { Button } from '../common/ui/Button';
 
@@ -13,7 +14,7 @@ const StockFilters = ({
     <div className="bg-white rounded-lg shadow p-4 mb-6">
       <div className="flex items-center justify-between mb-4">
         <h4 className="text-lg font-semibold text-gray-900">
-          {selectedWarehouse.name} — Stock Levels
+          {selectedWarehouse?.name || 'Warehouse'} — Stock Levels
         </h4>
         {hasActiveFilters && (
           <span className="text-sm text-gray-500">Filtered results</span>

@@ -16,7 +16,7 @@ import StockUpdateModal from './modals/StockUpdateModal';
 const WarehouseStock = () => {
   const { user } = useAuth();
   const { warehouses, loading: warehousesLoading } = useWarehouses();
-  const { radiators, loading: radiatorsLoading } = useRadiators();
+  const { radiators, loading: radiatorsLoading, refetch } = useRadiators();
   const stockModal = useModal();
 
   const [selectedWarehouse, setSelectedWarehouse] = React.useState(null);
@@ -28,15 +28,57 @@ const WarehouseStock = () => {
     }
   }, [warehouses, selectedWarehouse]);
 
-  // Filter radiators by selected warehouse
+  // Filter radiators by selected warehouse and prepare data
   const warehouseItems = React.useMemo(() => {
-    if (!selectedWarehouse || !radiators.length) return [];
+    if (!selectedWarehouse || !radiators.length) {
+      console.log('No warehouse selected or no radiators:', { selectedWarehouse, radiatorsCount: radiators.length });
+      return [];
+    }
+    
+    console.log('Creating warehouse items for:', selectedWarehouse.code);
+    console.log('Sample radiator stock:', radiators[0]?.stock);
     
     return radiators.map(radiator => ({
       ...radiator,
       qty: radiator.stock?.[selectedWarehouse.code] ?? 0
     }));
   }, [radiators, selectedWarehouse]);
+
+  // Custom filter function for stock levels
+  const filterItems = (items, filters) => {
+    let filtered = [...items];
+
+    // Search filter
+    if (filters.search) {
+      const searchLower = filters.search.toLowerCase();
+      filtered = filtered.filter(item =>
+        item.name?.toLowerCase().includes(searchLower) ||
+        item.brand?.toLowerCase().includes(searchLower) ||
+        item.code?.toLowerCase().includes(searchLower)
+      );
+    }
+
+    // Stock level filter
+    if (filters.stockLevel && filters.stockLevel !== 'all') {
+      filtered = filtered.filter(item => {
+        const qty = item.qty || 0;
+        switch (filters.stockLevel) {
+          case 'available':
+            return qty > 0;
+          case 'good':
+            return qty > 5;
+          case 'low':
+            return qty > 0 && qty <= 5;
+          case 'out':
+            return qty === 0;
+          default:
+            return true;
+        }
+      });
+    }
+
+    return filtered;
+  };
 
   const {
     filteredData: filteredItems,
@@ -47,17 +89,40 @@ const WarehouseStock = () => {
   } = useFilters(warehouseItems, {
     search: '',
     stockLevel: 'all'
-  });
+  }, filterItems);
 
-  const handleStockUpdate = () => {
+  const handleStockUpdate = async () => {
     // Refresh data after stock update
-    window.location.reload(); // Simple refresh - could be optimized
+    if (refetch) {
+      await refetch();
+    } else {
+      window.location.reload();
+    }
   };
 
   const loading = warehousesLoading || radiatorsLoading;
 
+  console.log('WarehouseStock render:', {
+    loading,
+    warehousesCount: warehouses.length,
+    radiatorsCount: radiators.length,
+    selectedWarehouse: selectedWarehouse?.name,
+    warehouseItemsCount: warehouseItems.length,
+    filteredItemsCount: filteredItems.length
+  });
+
   if (loading) {
     return <LoadingSpinner size="lg" text="Loading warehouse stock..." />;
+  }
+
+  if (warehouses.length === 0) {
+    return (
+      <EmptyState
+        icon={Warehouse}
+        title="No Warehouses Found"
+        description="No warehouses are configured. Please add warehouses first."
+      />
+    );
   }
 
   return (
@@ -78,7 +143,7 @@ const WarehouseStock = () => {
             onSelect={setSelectedWarehouse}
           />
           
-          {selectedWarehouse && (
+          {selectedWarehouse && warehouseItems.length > 0 && (
             <StockStats 
               items={warehouseItems} 
               warehouse={selectedWarehouse}
@@ -94,6 +159,12 @@ const WarehouseStock = () => {
               icon={Warehouse}
               title="Select a Warehouse"
               description="Choose a warehouse from the left to view and manage stock levels"
+            />
+          ) : warehouseItems.length === 0 ? (
+            <EmptyState
+              icon={Package}
+              title="No Products Found"
+              description={`No products have stock configured for ${selectedWarehouse.name}`}
             />
           ) : (
             <>

@@ -2,7 +2,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Modal } from "../../common/ui/Modal";
 import { Button } from "../../common/ui/Button";
-import radiatorService from "../../../api/radiatorService";
 
 const emptyForm = {
   brand: "",
@@ -46,41 +45,55 @@ const AddRadiatorModal = ({ isOpen, onClose, onSuccess, warehouses = [] }) => {
     if (!form.brand?.trim()) return "Brand is required.";
     if (!form.code?.trim()) return "Code is required.";
     if (!form.name?.trim()) return "Name is required.";
-    if (form.year === "" || isNaN(Number(form.year))) return "Year must be a number.";
+    if (form.year === "" || isNaN(Number(form.year))) return "Year must be a valid number.";
+    if (Number(form.year) < 1900 || Number(form.year) > new Date().getFullYear() + 5) {
+      return "Year must be between 1900 and " + (new Date().getFullYear() + 5);
+    }
     return "";
   };
 
   const handleSave = async () => {
-    const v = validate();
-    if (v) {
-      setError(v);
+    const validationError = validate();
+    if (validationError) {
+      setError(validationError);
       return;
     }
 
     setSaving(true);
     setError("");
+    
     try {
       const payload = {
-        ...form,
+        brand: form.brand.trim(),
+        code: form.code.trim(),
+        name: form.name.trim(),
         year: Number(form.year),
-        initialStock: initialStock, // { AKL: 10, WEL: 0, ... }
+        // Include initial stock if warehouses are provided
+        ...(warehouses.length > 0 && { stock: initialStock })
       };
 
-      const res = await radiatorService.create(payload);
-      if (!res?.success) throw new Error(res?.error || "Failed to create radiator");
-
-      await onSuccess?.(res.data);
-      onClose?.();
+      // Call the onSuccess function which should handle the API call
+      const success = await onSuccess(payload);
+      if (!success) {
+        throw new Error("Failed to create radiator");
+      }
     } catch (e) {
-      console.error(e);
+      console.error('Error creating radiator:', e);
       setError(e.message || "Failed to create radiator");
     } finally {
       setSaving(false);
     }
   };
 
+  const handleClose = () => {
+    if (!saving) {
+      setError("");
+      onClose();
+    }
+  };
+
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Add New Radiator">
+    <Modal isOpen={isOpen} onClose={handleClose} title="Add New Radiator">
       <div className="space-y-5">
         {error && (
           <div className="text-sm text-red-700 bg-red-50 border border-red-200 rounded p-2">
@@ -91,59 +104,72 @@ const AddRadiatorModal = ({ isOpen, onClose, onSuccess, warehouses = [] }) => {
         {/* Basic details */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Brand</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Brand <span className="text-red-500">*</span>
+            </label>
             <input
               type="text"
               value={form.brand}
               onChange={(e) => updateField("brand", e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500"
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               placeholder="e.g., Denso"
+              disabled={saving}
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Code</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Code <span className="text-red-500">*</span>
+            </label>
             <input
               type="text"
               value={form.code}
               onChange={(e) => updateField("code", e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500"
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               placeholder="Unique product code"
+              disabled={saving}
             />
           </div>
 
           <div className="sm:col-span-2">
-            <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Name <span className="text-red-500">*</span>
+            </label>
             <input
               type="text"
               value={form.name}
               onChange={(e) => updateField("name", e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500"
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               placeholder="e.g., Toyota Corolla Radiator"
+              disabled={saving}
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Year</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Year <span className="text-red-500">*</span>
+            </label>
             <input
               type="number"
               value={form.year}
               onChange={(e) => updateField("year", e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500"
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               placeholder="e.g., 2018"
-              min={0}
+              min={1900}
+              max={new Date().getFullYear() + 5}
+              disabled={saving}
             />
           </div>
         </div>
 
         {/* Initial stock per warehouse */}
         {warehouses.length > 0 && (
-          <div className="space-y-2">
+          <div className="space-y-3">
             <div className="text-sm font-medium text-gray-900">Initial Stock by Warehouse</div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {warehouses.map((w) => (
                 <div key={w.id} className="flex items-center gap-3">
-                  <div className="min-w-0">
+                  <div className="min-w-0 flex-1">
                     <div className="text-sm font-medium text-gray-800">{w.name}</div>
                     <div className="text-xs text-gray-500">Code: {w.code}</div>
                   </div>
@@ -152,8 +178,9 @@ const AddRadiatorModal = ({ isOpen, onClose, onSuccess, warehouses = [] }) => {
                     min={0}
                     value={initialStock[w.code] ?? 0}
                     onChange={(e) => updateWarehouseQty(w.code, e.target.value)}
-                    className="w-28 border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500"
+                    className="w-20 border border-gray-300 rounded-lg px-2 py-1 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     placeholder="0"
+                    disabled={saving}
                   />
                 </div>
               ))}
@@ -162,12 +189,12 @@ const AddRadiatorModal = ({ isOpen, onClose, onSuccess, warehouses = [] }) => {
         )}
 
         {/* Actions */}
-        <div className="flex justify-end gap-2">
-          <Button variant="outline" onClick={onClose} disabled={saving}>
+        <div className="flex justify-end gap-2 pt-4 border-t border-gray-200">
+          <Button variant="outline" onClick={handleClose} disabled={saving}>
             Cancel
           </Button>
           <Button onClick={handleSave} disabled={saving}>
-            {saving ? "Saving..." : "Create"}
+            {saving ? "Creating..." : "Create Radiator"}
           </Button>
         </div>
       </div>

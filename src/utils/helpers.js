@@ -39,15 +39,62 @@ export const getNestedValue = (obj, path) => {
   return path.split('.').reduce((current, key) => current?.[key], obj);
 };
 
+// Updated filterArray function to add to your src/utils/helpers.js file
+
 export const filterArray = (array, filters) => {
   return array.filter(item => {
     return Object.entries(filters).every(([key, value]) => {
-      if (!value || value === 'all') return true;
+      // Skip if no filter value or it's set to 'all'
+      if (!value || value === 'all' || value === '') return true;
       
+      // Special handling for stockLevel filter
+      if (key === 'stockLevel') {
+        const qty = item.qty || 0;
+        
+        switch(value) {
+          case 'available':
+            return qty > 0;
+          case 'good':
+            return qty > 5;
+          case 'low':
+            return qty >= 1 && qty <= 5;
+          case 'out':
+            return qty === 0;
+          default:
+            return true;
+        }
+      }
+      
+      // Special handling for search filter - check multiple fields
+      if (key === 'search') {
+        const searchTerm = value.toLowerCase();
+        return (
+          item.name?.toLowerCase().includes(searchTerm) ||
+          item.code?.toLowerCase().includes(searchTerm) ||
+          item.brand?.toLowerCase().includes(searchTerm) ||
+          item.year?.toString().includes(searchTerm)
+        );
+      }
+      
+      // Special handling for date range filters
+      if (key === 'dateRange' && value.start && value.end) {
+        const itemDate = new Date(item.date || item.createdAt);
+        const startDate = new Date(value.start);
+        const endDate = new Date(value.end);
+        endDate.setHours(23, 59, 59, 999); // Include the entire end day
+        return itemDate >= startDate && itemDate <= endDate;
+      }
+      
+      // Special handling for status filters
+      if (key === 'status' && value !== 'all') {
+        return item.status === value;
+      }
+      
+      // Default behavior for other filters
       const itemValue = key.includes('.') ? getNestedValue(item, key) : item[key];
       
-      if (typeof value === 'string') {
-        return itemValue?.toString().toLowerCase().includes(value.toLowerCase());
+      if (typeof value === 'string' && typeof itemValue === 'string') {
+        return itemValue.toLowerCase().includes(value.toLowerCase());
       }
       
       return itemValue === value;
@@ -112,3 +159,7 @@ export const isDateInRange = (date, startDate, endDate) => {
   
   return true;
 };
+
+
+
+

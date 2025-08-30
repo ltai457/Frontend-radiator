@@ -1,71 +1,103 @@
-import React from 'react';
-import { Edit, Trash2, Package } from 'lucide-react';
-import { Table, TableHead, TableHeader, TableBody, TableRow, TableCell } from '../common/ui/Table';
-import { Button } from '../common/ui/Button';
+import React from "react";
+import { Edit, Trash2, Package } from "lucide-react";
+import {
+  Table,
+  TableHead,
+  TableHeader,
+  TableBody,
+  TableRow,
+  TableCell,
+} from "../common/ui/Table";
+import { Button } from "../common/ui/Button";
 
-const RadiatorTable = ({ radiators, onEdit, onDelete, onEditStock, userRole }) => {
+const RadiatorTable = ({
+  radiators,
+  onEdit,
+  onDelete,
+  onEditStock,
+  userRole,
+}) => {
   const getTotalStock = (stock) => {
     if (!stock) return 0;
     return Object.values(stock).reduce((total, qty) => total + (qty || 0), 0);
   };
 
   const getStockColor = (totalStock) => {
-    if (totalStock === 0) return 'text-red-600';
-    if (totalStock <= 5) return 'text-yellow-600';
-    return 'text-green-600';
+    if (totalStock === 0) return "text-red-600";
+    if (totalStock <= 5) return "text-yellow-600";
+    return "text-green-600";
   };
 
   return (
-    <Table>
-      <TableHead>
-        <tr>
-          <TableHeader>Product</TableHeader>
-          <TableHeader>Brand</TableHeader>
-          <TableHeader>Code</TableHeader>
-          <TableHeader>Year</TableHeader>
-          <TableHeader>Stock</TableHeader>
-          <TableHeader className="text-right">Actions</TableHeader>
-        </tr>
-      </TableHead>
+    <Table className="min-w-[960px] table-auto">
+      <TableHeader className="table-header-group">
+        <TableRow className="table-row">
+          <TableHead className="table-cell w-36 text-center align-middle">
+            Product
+          </TableHead>
+          <TableHead className="table-cell text-center align-middle">
+            Brand
+          </TableHead>
+          <TableHead className="table-cell text-center align-middle">
+            Code
+          </TableHead>
+          <TableHead className="table-cell text-center align-middle">
+            Year
+          </TableHead>
+          <TableHead className="table-cell w-40 text-center align-middle">
+            Stock
+          </TableHead>
+          <TableHead className="table-cell w-50 text-center align-middle">
+            Actions
+          </TableHead>
+        </TableRow>
+      </TableHeader>
+
       <TableBody>
         {radiators.map((radiator) => {
           const totalStock = getTotalStock(radiator.stock);
-          
+
           return (
             <TableRow key={radiator.id}>
               <TableCell>
                 <div className="font-medium text-gray-900">{radiator.name}</div>
               </TableCell>
-              
+
               <TableCell>
                 <div className="text-sm text-gray-900">{radiator.brand}</div>
               </TableCell>
-              
+
               <TableCell>
-                <div className="text-sm font-mono text-gray-900">{radiator.code}</div>
+                <div className="text-sm font-mono text-gray-900">
+                  {radiator.code}
+                </div>
               </TableCell>
-              
+
               <TableCell>
                 <div className="text-sm text-gray-900">{radiator.year}</div>
               </TableCell>
-              
-              <TableCell>
-                <div className={`text-sm font-medium ${getStockColor(totalStock)}`}>
+
+              {/* STOCK — centered */}
+              <TableCell className="text-center align-middle">
+                <div
+                  className={`text-sm font-medium ${getStockColor(totalStock)}`}
+                >
                   {totalStock} units
                 </div>
                 {radiator.stock && (
-                  <div className="text-xs text-gray-500">
+                  <div className="mt-0.5 text-xs text-gray-500 inline-flex flex-wrap justify-center gap-x-2">
                     {Object.entries(radiator.stock).map(([warehouse, qty]) => (
-                      <span key={warehouse} className="mr-2">
+                      <span key={warehouse}>
                         {warehouse}: {qty}
                       </span>
                     ))}
                   </div>
                 )}
               </TableCell>
-              
-              <TableCell className="text-right">
-                <div className="flex items-center justify-end gap-2">
+
+              {/* ACTIONS — centered */}
+              <TableCell className="text-center align-middle">
+                <div className="inline-flex items-center justify-center gap-2">
                   <Button
                     variant="ghost"
                     size="sm"
@@ -73,8 +105,8 @@ const RadiatorTable = ({ radiators, onEdit, onDelete, onEditStock, userRole }) =
                     icon={Package}
                     className="p-1 text-blue-600 hover:text-blue-800"
                   />
-                  
-                  {userRole === 'Admin' && (
+
+                  {userRole === "Admin" && (
                     <>
                       <Button
                         variant="ghost"

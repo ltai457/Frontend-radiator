@@ -2,6 +2,7 @@ import React from 'react';
 import { Package, Plus, Search } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useRadiators } from '../../hooks/useRadiators';
+import { useWarehouses } from '../../hooks/useWarehouses';
 import { useModal } from '../../hooks/useModal';
 import { useFilters } from '../../hooks/useFilters';
 import { LoadingSpinner } from '../common/ui/LoadingSpinner';
@@ -22,8 +23,11 @@ const RadiatorList = () => {
     error, 
     createRadiator, 
     updateRadiator, 
-    deleteRadiator 
+    deleteRadiator,
+    refetch
   } = useRadiators();
+  
+  const { warehouses } = useWarehouses();
   
   const addModal = useModal();
   const editModal = useModal();
@@ -42,31 +46,76 @@ const RadiatorList = () => {
   });
 
   const handleAddRadiator = async (radiatorData) => {
-    const result = await createRadiator(radiatorData);
-    if (result.success) {
-      addModal.closeModal();
-      return true;
+    try {
+      const result = await createRadiator(radiatorData);
+      if (result.success) {
+        addModal.closeModal();
+        // Refresh the data
+        if (refetch) {
+          await refetch();
+        }
+        return true;
+      } else {
+        throw new Error(result.error || 'Failed to create radiator');
+      }
+    } catch (error) {
+      console.error('Error adding radiator:', error);
+      alert('Failed to add radiator: ' + error.message);
+      return false;
     }
-    return false;
   };
 
   const handleEditRadiator = async (radiatorData) => {
-    const result = await updateRadiator(editModal.data.id, radiatorData);
-    if (result.success) {
-      editModal.closeModal();
-      return true;
+    try {
+      const result = await updateRadiator(editModal.data.id, radiatorData);
+      if (result.success) {
+        editModal.closeModal();
+        // Refresh the data
+        if (refetch) {
+          await refetch();
+        }
+        return true;
+      } else {
+        throw new Error(result.error || 'Failed to update radiator');
+      }
+    } catch (error) {
+      console.error('Error updating radiator:', error);
+      alert('Failed to update radiator: ' + error.message);
+      return false;
     }
-    return false;
   };
 
   const handleDeleteRadiator = async (radiator) => {
-    if (!window.confirm(`Are you sure you want to delete ${radiator.name}?`)) {
+    const confirmMessage = `Are you sure you want to delete "${radiator.name}"?\n\nThis will also remove all stock levels for this product across all warehouses.\n\nThis action cannot be undone.`;
+    
+    if (!window.confirm(confirmMessage)) {
       return;
     }
     
-    const result = await deleteRadiator(radiator.id);
-    if (!result.success) {
-      alert('Failed to delete radiator: ' + result.error);
+    try {
+      const result = await deleteRadiator(radiator.id);
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to delete radiator');
+      }
+      
+      // Refresh the data
+      if (refetch) {
+        await refetch();
+      } else {
+        window.location.reload();
+      }
+    } catch (error) {
+      console.error('Error deleting radiator:', error);
+      alert('Failed to delete radiator: ' + error.message);
+    }
+  };
+
+  const handleStockUpdate = async () => {
+    // Refresh data after stock update
+    if (refetch) {
+      await refetch();
+    } else {
+      window.location.reload();
     }
   };
 
@@ -134,23 +183,21 @@ const RadiatorList = () => {
       <AddRadiatorModal
         isOpen={addModal.isOpen}
         onClose={addModal.closeModal}
-        onSubmit={handleAddRadiator}
+        onSuccess={handleAddRadiator}
+        warehouses={warehouses || []}
       />
       
       <EditRadiatorModal
         isOpen={editModal.isOpen}
         onClose={editModal.closeModal}
-        onSubmit={handleEditRadiator}
+        onSuccess={handleEditRadiator}
         radiator={editModal.data}
       />
       
       <StockUpdateModal
         isOpen={stockModal.isOpen}
         onClose={stockModal.closeModal}
-        onSuccess={() => {
-          // Refresh radiators to get updated stock
-          window.location.reload(); // Simple refresh - could be optimized
-        }}
+        onSuccess={handleStockUpdate}
         radiator={stockModal.data}
       />
     </div>
