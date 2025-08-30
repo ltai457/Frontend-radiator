@@ -1,17 +1,39 @@
 // src/components/StockUpdateModal.jsx
 import React, { useState, useEffect } from 'react';
 import radiatorService from '../api/radiatorService';
+import warehouseService from '../api/warehouseService';
 
 const StockUpdateModal = ({ isOpen, onClose, onSuccess, radiator }) => {
   const [stockLevels, setStockLevels] = useState({});
+  const [warehouses, setWarehouses] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [updateResults, setUpdateResults] = useState({});
 
-  // Load current stock when modal opens
+  // Load warehouses and current stock when modal opens
   useEffect(() => {
-    if (isOpen && radiator) {
-      setStockLevels(radiator.stock || {});
-    }
+    const loadData = async () => {
+      if (isOpen && radiator) {
+        // Load warehouses
+        const whResult = await warehouseService.getAll();
+        if (whResult.success) {
+          setWarehouses(whResult.data);
+        }
+        
+        // Set initial stock levels from radiator prop, or load from API
+        if (radiator.stock && Object.keys(radiator.stock).length > 0) {
+          setStockLevels(radiator.stock);
+        } else {
+          // Fallback: load from API
+          const stockResult = await radiatorService.getStock(radiator.id);
+          if (stockResult.success) {
+            setStockLevels(stockResult.data.stock || {});
+          }
+        }
+      }
+    };
+    
+    loadData();
   }, [isOpen, radiator]);
 
   const handleStockChange = (warehouseCode, value) => {
@@ -21,6 +43,15 @@ const StockUpdateModal = ({ isOpen, onClose, onSuccess, radiator }) => {
         ...prev,
         [warehouseCode]: quantity
       }));
+      
+      // Clear any previous update result for this warehouse
+      if (updateResults[warehouseCode]) {
+        setUpdateResults(prev => {
+          const newResults = { ...prev };
+          delete newResults[warehouseCode];
+          return newResults;
+        });
+      }
     }
   };
 
@@ -31,10 +62,51 @@ const StockUpdateModal = ({ isOpen, onClose, onSuccess, radiator }) => {
     const quantity = stockLevels[warehouseCode];
     const result = await radiatorService.updateStock(radiator.id, warehouseCode, quantity);
     
+    // Store the result for this warehouse
+    setUpdateResults(prev => ({
+      ...prev,
+      [warehouseCode]: result
+    }));
+    
     if (result.success) {
-      onSuccess(radiator.id); // Refresh parent data
+      // Call success callback to refresh parent data
+      if (onSuccess) {
+        onSuccess();
+      }
     } else {
       setError(result.error);
+    }
+    setLoading(false);
+  };
+
+  const handleUpdateAllStock = async () => {
+    setLoading(true);
+    setError('');
+    setUpdateResults({});
+
+    const result = await radiatorService.updateStockBulk(radiator.id, stockLevels);
+    
+    if (result.success) {
+      // Mark all as successful
+      const allResults = {};
+      Object.keys(stockLevels).forEach(code => {
+        allResults[code] = { success: true };
+      });
+      setUpdateResults(allResults);
+      
+      if (onSuccess) {
+        onSuccess();
+      }
+    } else {
+      setError(result.error);
+      // If we have detailed results, use them
+      if (result.data) {
+        const detailedResults = {};
+        result.data.forEach(({ warehouseCode, result: itemResult }) => {
+          detailedResults[warehouseCode] = itemResult;
+        });
+        setUpdateResults(detailedResults);
+      }
     }
     setLoading(false);
   };
@@ -42,11 +114,28 @@ const StockUpdateModal = ({ isOpen, onClose, onSuccess, radiator }) => {
   const handleClose = () => {
     if (!loading) {
       setError('');
+      setUpdateResults({});
       onClose();
     }
   };
 
+  const getWarehouseName = (code) => {
+    const warehouse = warehouses.find(w => w.code === code);
+    return warehouse ? warehouse.name : code;
+  };
+
+  const getUpdateStatus = (warehouseCode) => {
+    const result = updateResults[warehouseCode];
+    if (!result) return null;
+    return result.success ? 'success' : 'error';
+  };
+
   if (!isOpen || !radiator) return null;
+
+  // Get warehouse codes from either the current stock or warehouses list
+  const warehouseCodes = warehouses.length > 0 
+    ? warehouses.map(w => w.code)
+    : Object.keys(stockLevels);
 
   return (
     <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
@@ -78,59 +167,67 @@ const StockUpdateModal = ({ isOpen, onClose, onSuccess, radiator }) => {
 
           {/* Stock levels for each warehouse */}
           <div className="space-y-4">
-            {Object.entries(stockLevels).map(([warehouseCode, quantity]) => (
-              <div key={warehouseCode} className="flex items-center justify-between p-3 border border-gray-200 rounded">
-                <div>
-                  <h4 className="font-medium text-gray-900">{getWarehouseName(warehouseCode)}</h4>
-                  <p className="text-sm text-gray-500">{warehouseCode}</p>
+            {warehouseCodes.map((warehouseCode) => {
+              const quantity = stockLevels[warehouseCode] || 0;
+              const status = getUpdateStatus(warehouseCode);
+              
+              return (
+                <div key={warehouseCode} className="flex items-center justify-between p-3 border border-gray-200 rounded">
+                  <div>
+                    <h4 className="font-medium text-gray-900">{getWarehouseName(warehouseCode)}</h4>
+                    <p className="text-sm text-gray-500">{warehouseCode}</p>
+                  </div>
+                  
+                  <div className="flex items-center space-x-3">
+                    <input
+                      type="number"
+                      min="0"
+                      value={quantity}
+                      onChange={(e) => handleStockChange(warehouseCode, e.target.value)}
+                      className="input-field w-20 text-center"
+                      disabled={loading}
+                    />
+                    <button
+                      onClick={() => handleUpdateStock(warehouseCode)}
+                      disabled={loading}
+                      className={`px-3 py-1 rounded text-sm font-medium ${
+                        status === 'success' 
+                          ? 'bg-green-100 text-green-800'
+                          : status === 'error'
+                          ? 'bg-red-100 text-red-800'
+                          : 'bg-blue-600 hover:bg-blue-700 text-white'
+                      }`}
+                    >
+                      {loading ? '...' : status === 'success' ? '✓' : status === 'error' ? '✗' : 'Update'}
+                    </button>
+                  </div>
                 </div>
-                
-                <div className="flex items-center space-x-3">
-                  <input
-                    type="number"
-                    min="0"
-                    value={quantity}
-                    onChange={(e) => handleStockChange(warehouseCode, e.target.value)}
-                    className="input-field w-20 text-center"
-                    disabled={loading}
-                  />
-                  <button
-                    onClick={() => handleUpdateStock(warehouseCode)}
-                    disabled={loading}
-                    className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-sm"
-                  >
-                    {loading ? '...' : 'Update'}
-                  </button>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
 
-          {/* Close button */}
-          <div className="flex justify-end pt-6">
+          {/* Action buttons */}
+          <div className="flex justify-between pt-6">
+            <button
+              onClick={handleUpdateAllStock}
+              disabled={loading}
+              className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded text-sm font-medium"
+            >
+              {loading ? 'Updating All...' : 'Update All'}
+            </button>
+            
             <button
               onClick={handleClose}
               disabled={loading}
               className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-200 hover:bg-gray-300 rounded-md"
             >
-              Done
+              {Object.keys(updateResults).length > 0 ? 'Done' : 'Cancel'}
             </button>
           </div>
         </div>
       </div>
     </div>
   );
-};
-
-// Helper function to get warehouse display names
-const getWarehouseName = (code) => {
-  const warehouseNames = {
-    'WH_AKL': 'Auckland Main Warehouse',
-    'WH_CHC': 'Christchurch Warehouse', 
-    'WH_WLG': 'Wellington Warehouse',
-    // Handle any other codes that might exist
-  };
-  return warehouseNames[code] || code;
 };
 
 export default StockUpdateModal;
