@@ -1,42 +1,54 @@
 import React from 'react';
 import { formatCurrency, formatDateTime } from '../../utils/formatters';
 
-const RecentActivity = () => {
-  // This would typically come from an API or context
-  const activities = [
-    {
-      id: 1,
-      type: 'sale',
-      message: 'New sale created',
-      details: 'John Smith - $485.75',
-      time: new Date(Date.now() - 1000 * 60 * 30), // 30 minutes ago
-      color: 'blue'
-    },
-    {
-      id: 2,
-      type: 'stock',
-      message: 'Stock updated',
-      details: 'Toyota Camry Radiator +10 units',
-      time: new Date(Date.now() - 1000 * 60 * 60), // 1 hour ago
-      color: 'green'
-    },
-    {
-      id: 3,
-      type: 'customer',
-      message: 'New customer added',
-      details: 'Sarah Johnson',
-      time: new Date(Date.now() - 1000 * 60 * 60 * 2), // 2 hours ago
-      color: 'purple'
-    },
-    {
-      id: 4,
-      type: 'sale',
-      message: 'Sale refunded',
-      details: 'Mike Wilson - $325.00',
-      time: new Date(Date.now() - 1000 * 60 * 60 * 4), // 4 hours ago
-      color: 'red'
-    }
-  ];
+const RecentActivity = ({ sales = [], customers = [] }) => {
+  // Generate real activities from actual data
+  const generateActivities = () => {
+    const activities = [];
+
+    // Add recent sales (last 5)
+    const recentSales = sales
+      .sort((a, b) => new Date(b.saleDate) - new Date(a.saleDate))
+      .slice(0, 3);
+
+    recentSales.forEach(sale => {
+      activities.push({
+        id: `sale-${sale.id}`,
+        type: 'sale',
+        message: sale.status === 'Completed' ? 'Sale completed' : 
+                 sale.status === 'Cancelled' ? 'Sale cancelled' :
+                 sale.status === 'Refunded' ? 'Sale refunded' : 'Sale created',
+        details: `${sale.customerName} - ${formatCurrency(sale.totalAmount)}`,
+        time: new Date(sale.saleDate),
+        color: sale.status === 'Completed' ? 'blue' : 
+               sale.status === 'Cancelled' ? 'red' :
+               sale.status === 'Refunded' ? 'orange' : 'gray'
+      });
+    });
+
+    // Add recent customers (last 2)
+    const recentCustomers = customers
+      .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0))
+      .slice(0, 2);
+
+    recentCustomers.forEach(customer => {
+      activities.push({
+        id: `customer-${customer.id}`,
+        type: 'customer',
+        message: 'New customer added',
+        details: `${customer.firstName} ${customer.lastName}${customer.company ? ` - ${customer.company}` : ''}`,
+        time: new Date(customer.createdAt || Date.now()),
+        color: 'purple'
+      });
+    });
+
+    // Sort all activities by time (most recent first)
+    return activities
+      .sort((a, b) => new Date(b.time) - new Date(a.time))
+      .slice(0, 6); // Show max 6 activities
+  };
+
+  const activities = generateActivities();
 
   const getActivityIcon = (type) => {
     switch (type) {
@@ -48,19 +60,19 @@ const RecentActivity = () => {
             </svg>
           </div>
         );
-      case 'stock':
-        return (
-          <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
-            <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-            </svg>
-          </div>
-        );
       case 'customer':
         return (
           <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center">
             <svg className="w-4 h-4 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+            </svg>
+          </div>
+        );
+      case 'stock':
+        return (
+          <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
+            <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
             </svg>
           </div>
         );
@@ -93,18 +105,25 @@ const RecentActivity = () => {
     <div className="bg-white rounded-lg shadow p-6">
       <h3 className="text-lg font-semibold text-gray-900 mb-4">Recent Activity</h3>
       <div className="space-y-4">
-        {activities.map((activity) => (
-          <div key={activity.id} className="flex items-start space-x-3">
-            {getActivityIcon(activity.type)}
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-gray-900">{activity.message}</p>
-              <p className="text-sm text-gray-500">{activity.details}</p>
-            </div>
-            <div className="text-xs text-gray-400 whitespace-nowrap">
-              {formatTimeAgo(activity.time)}
-            </div>
+        {activities.length === 0 ? (
+          <div className="text-center py-8 text-gray-500">
+            <p>No recent activity</p>
+            <p className="text-sm">Activity will appear here as you use the system</p>
           </div>
-        ))}
+        ) : (
+          activities.map((activity) => (
+            <div key={activity.id} className="flex items-start space-x-3">
+              {getActivityIcon(activity.type)}
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-gray-900">{activity.message}</p>
+                <p className="text-sm text-gray-500">{activity.details}</p>
+              </div>
+              <div className="text-xs text-gray-400 whitespace-nowrap">
+                {formatTimeAgo(activity.time)}
+              </div>
+            </div>
+          ))
+        )}
       </div>
     </div>
   );

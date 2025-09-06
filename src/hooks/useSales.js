@@ -8,17 +8,23 @@ export const useSales = () => {
   const [error, setError] = useState('');
 
   const fetchSales = useCallback(async () => {
+    console.log('🔄 Fetching sales...');
     setLoading(true);
     setError('');
     
     try {
       const result = await salesService.getAll();
+      console.log('📊 Sales fetch result:', result);
+      
       if (result.success) {
+        console.log('✅ Sales loaded successfully:', result.data.length, 'sales');
         setSales(result.data);
       } else {
+        console.error('❌ Failed to load sales:', result.error);
         setError(result.error || 'Failed to load sales');
       }
     } catch (err) {
+      console.error('❌ Sales fetch error:', err);
       setError(getErrorMessage(err));
     } finally {
       setLoading(false);
@@ -26,15 +32,23 @@ export const useSales = () => {
   }, []);
 
   const createSale = async (saleData) => {
+    console.log('🆕 Creating sale with data:', saleData);
+    
     try {
       const result = await salesService.create(saleData);
+      console.log('💰 Create sale result:', result);
+      
       if (result.success) {
-        setSales(prev => [result.data, ...prev]);
+        console.log('✅ Sale created successfully, refreshing list...');
+        // Refresh the entire list to get correct SaleListDto format
+        await fetchSales();
         return { success: true, data: result.data };
       } else {
+        console.error('❌ Failed to create sale:', result.error);
         return { success: false, error: result.error };
       }
     } catch (err) {
+      console.error('❌ Create sale error:', err);
       return { success: false, error: getErrorMessage(err) };
     }
   };
@@ -102,8 +116,14 @@ export const useSales = () => {
   };
 
   useEffect(() => {
+    console.log('🚀 useSales mounting, fetching initial sales...');
     fetchSales();
   }, [fetchSales]);
+
+  // Log sales state changes
+  useEffect(() => {
+    console.log('📈 Sales state updated:', sales.length, 'sales in array');
+  }, [sales]);
 
   return {
     sales,

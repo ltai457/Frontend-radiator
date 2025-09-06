@@ -1,9 +1,8 @@
-import React from 'react';
+import React, { useState, useMemo } from 'react';
 import { ShoppingCart, Plus } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSales } from '../../hooks/useSales';
 import { useModal } from '../../hooks/useModal';
-import { useFilters } from '../../hooks/useFilters';
 import { PageHeader } from '../common/layout/PageHeader';
 import { LoadingSpinner } from '../common/ui/LoadingSpinner';
 import { Button } from '../common/ui/Button';
@@ -25,24 +24,71 @@ const SalesManagement = () => {
     getSaleById, 
     getReceipt, 
     cancelSale, 
-    refundSale 
+    refundSale
   } = useSales();
   
   const createModal = useModal();
   const detailsModal = useModal();
   const receiptModal = useModal();
 
-  const {
-    filteredData: filteredSales,
-    filters,
-    setFilter,
-    clearFilters,
-    hasActiveFilters
-  } = useFilters(sales, {
+  // Manual filter state instead of useFilters hook
+  const [filters, setFilters] = useState({
     search: '',
     status: 'all',
     dateRange: { start: '', end: '' }
   });
+
+  const setFilter = (key, value) => {
+    setFilters(prev => ({ ...prev, [key]: value }));
+  };
+
+  const clearFilters = () => {
+    setFilters({
+      search: '',
+      status: 'all',
+      dateRange: { start: '', end: '' }
+    });
+  };
+
+  const hasActiveFilters = Object.values(filters).some(value => {
+    if (typeof value === 'object') {
+      return Object.values(value).some(v => v && v !== '');
+    }
+    return value && value !== 'all' && value !== '';
+  });
+
+  // Manual filtering - simple and clean
+  const filteredSales = useMemo(() => {
+    return sales.filter(sale => {
+      // Search filter
+      if (filters.search && filters.search.trim()) {
+        const searchTerm = filters.search.toLowerCase();
+        const matchesSearch = (
+          sale.saleNumber?.toLowerCase().includes(searchTerm) ||
+          sale.customerName?.toLowerCase().includes(searchTerm) ||
+          sale.processedByName?.toLowerCase().includes(searchTerm)
+        );
+        if (!matchesSearch) return false;
+      }
+
+      // Status filter
+      if (filters.status && filters.status !== 'all') {
+        if (sale.status !== filters.status) return false;
+      }
+
+      // Date range filter - only apply if both dates are set
+      if (filters.dateRange?.start && filters.dateRange?.end) {
+        const saleDate = new Date(sale.saleDate);
+        const startDate = new Date(filters.dateRange.start);
+        const endDate = new Date(filters.dateRange.end);
+        endDate.setHours(23, 59, 59, 999);
+        
+        if (saleDate < startDate || saleDate > endDate) return false;
+      }
+
+      return true;
+    });
+  }, [sales, filters]);
 
   const handleCreateSale = async (saleData) => {
     const result = await createSale(saleData);

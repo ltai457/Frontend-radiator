@@ -1,5 +1,6 @@
 // src/api/customerService.js
 import axios from 'axios';
+import authService from './authService';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE || 'http://localhost:5128/api/v1';
 
@@ -11,9 +12,9 @@ const api = axios.create({
   }
 });
 
-// Add token to requests
+// Add token to requests using the secure auth service
 api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('accessToken');
+  const token = authService.getValidToken();
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }

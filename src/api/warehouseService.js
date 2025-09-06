@@ -1,8 +1,10 @@
 // src/api/warehouseService.js
+import authService from './authService';
+
 const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:5128/api/v1';
 
 const authHeaders = () => {
-  const token = localStorage.getItem('accessToken');
+  const token = authService.getValidToken();
   return {
     'accept': 'application/json',
     'Content-Type': 'application/json',
