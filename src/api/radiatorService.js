@@ -2,7 +2,7 @@
 import axios from 'axios';
 import authService from './authService';
 
-const API_BASE_URL = 'http://localhost:5128/api/v1';
+const API_BASE_URL = import.meta.env.VITE_API_BASE || 'http://localhost:5128/api/v1';
 
 // Create axios instance with auth interceptor
 const api = axios.create({
@@ -24,11 +24,13 @@ api.interceptors.request.use((config) => {
 // Add response interceptor for debugging
 api.interceptors.response.use(
   (response) => {
-    console.log('✅ API Success:', response.config.method.toUpperCase(), response.config.url, response.status);
+    if (import.meta.env.VITE_DEBUG === 'true') {
+      console.log('✅ Radiator API Success:', response.config.method.toUpperCase(), response.config.url, response.status);
+    }
     return response;
   },
   (error) => {
-    console.error('❌ API Error:', error.config?.method?.toUpperCase(), error.config?.url, error.response?.status, error.response?.data);
+    console.error('❌ Radiator API Error:', error.config?.method?.toUpperCase(), error.config?.url, error.response?.status, error.response?.data);
     return Promise.reject(error);
   }
 );
@@ -61,7 +63,7 @@ const radiatorService = {
       console.error('❌ Create radiator error:', error.response?.data || error.message);
       return { 
         success: false, 
-        error: error.response?.data?.message || error.message || 'Failed to create radiator' 
+        error: error.response?.data?.message || error.message || 'Failed to create radiator - check API connection' 
       };
     }
   },
@@ -69,12 +71,15 @@ const radiatorService = {
   // Get all radiators
   async getAll() {
     try {
+      console.log('📊 Fetching all radiators...');
       const response = await api.get('/radiators');
+      console.log('✅ Radiators loaded:', response.data.length, 'items');
       return { success: true, data: response.data };
     } catch (error) {
+      console.error('❌ Get radiators error:', error.response?.data || error.message);
       return { 
         success: false, 
-        error: error.response?.data?.message || 'Failed to fetch radiators' 
+        error: error.response?.data?.message || 'Failed to fetch radiators - check API connection' 
       };
     }
   },
@@ -82,12 +87,15 @@ const radiatorService = {
   // Get single radiator by ID
   async getById(id) {
     try {
+      console.log('📊 Fetching radiator by ID:', id);
       const response = await api.get(`/radiators/${id}`);
+      console.log('✅ Radiator loaded:', response.data);
       return { success: true, data: response.data };
     } catch (error) {
+      console.error('❌ Get radiator by ID error:', error.response?.data || error.message);
       return { 
         success: false, 
-        error: error.response?.data?.message || 'Failed to fetch radiator' 
+        error: error.response?.data?.message || 'Failed to fetch radiator - check API connection' 
       };
     }
   },
@@ -95,51 +103,63 @@ const radiatorService = {
   // Update radiator
   async update(id, radiatorData) {
     try {
+      console.log('📝 Updating radiator:', id, radiatorData);
       const response = await api.put(`/radiators/${id}`, radiatorData);
+      console.log('✅ Radiator updated:', response.data);
       return { success: true, data: response.data };
     } catch (error) {
+      console.error('❌ Update radiator error:', error.response?.data || error.message);
       return { 
         success: false, 
-        error: error.response?.data?.message || 'Failed to update radiator' 
+        error: error.response?.data?.message || error.message || 'Failed to update radiator' 
       };
     }
   },
 
-  // Delete radiator (Admin only)
+  // Delete radiator
   async delete(id) {
     try {
+      console.log('🗑️ Deleting radiator:', id);
       await api.delete(`/radiators/${id}`);
+      console.log('✅ Radiator deleted:', id);
       return { success: true };
     } catch (error) {
+      console.error('❌ Delete radiator error:', error.response?.data || error.message);
       return { 
         success: false, 
-        error: error.response?.data?.message || 'Failed to delete radiator' 
+        error: error.response?.data?.message || error.message || 'Failed to delete radiator' 
       };
     }
   },
 
-  // Get radiator stock
-  async getStock(id) {
+  // Search radiators
+  async search(searchTerm) {
     try {
-      const response = await api.get(`/radiators/${id}/stock`);
+      console.log('🔍 Searching radiators:', searchTerm);
+      const response = await api.get(`/radiators/search?q=${encodeURIComponent(searchTerm)}`);
+      console.log('✅ Search results:', response.data.length, 'items');
       return { success: true, data: response.data };
     } catch (error) {
+      console.error('❌ Search radiators error:', error.response?.data || error.message);
       return { 
         success: false, 
-        error: error.response?.data?.message || 'Failed to fetch stock' 
+        error: error.response?.data?.message || 'Failed to search radiators' 
       };
     }
   },
 
-  // Update radiator stock
-  async updateStock(id, stockData) {
+  // Get radiator stock levels across all warehouses
+  async getStockLevels(radiatorId) {
     try {
-      const response = await api.put(`/radiators/${id}/stock`, stockData);
+      console.log('📦 Fetching stock levels for radiator:', radiatorId);
+      const response = await api.get(`/radiators/${radiatorId}/stock`);
+      console.log('✅ Stock levels loaded:', response.data);
       return { success: true, data: response.data };
     } catch (error) {
+      console.error('❌ Get stock levels error:', error.response?.data || error.message);
       return { 
         success: false, 
-        error: error.response?.data?.message || 'Failed to update stock' 
+        error: error.response?.data?.message || 'Failed to fetch stock levels' 
       };
     }
   }
