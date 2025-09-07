@@ -15,7 +15,7 @@ const RadiatorTable = ({
   onEdit,
   onDelete,
   onEditStock,
-  userRole,
+  isAdmin, // boolean passed from parent
 }) => {
   const getTotalStock = (stock) => {
     if (!stock) return 0;
@@ -27,6 +27,8 @@ const RadiatorTable = ({
     if (totalStock <= 5) return "text-yellow-600";
     return "text-green-600";
   };
+
+  const userIsAdmin = !!isAdmin;
 
   return (
     <Table className="min-w-[960px] table-auto">
@@ -104,9 +106,10 @@ const RadiatorTable = ({
                     onClick={() => onEditStock(radiator)}
                     icon={Package}
                     className="p-1 text-blue-600 hover:text-blue-800"
+                    title="Edit Stock"
                   />
 
-                  {userRole === "Admin" && (
+                  {userIsAdmin && (
                     <>
                       <Button
                         variant="ghost"
@@ -114,6 +117,7 @@ const RadiatorTable = ({
                         onClick={() => onEdit(radiator)}
                         icon={Edit}
                         className="p-1 text-yellow-600 hover:text-yellow-800"
+                        title="Edit Radiator"
                       />
                       <Button
                         variant="ghost"
@@ -121,6 +125,7 @@ const RadiatorTable = ({
                         onClick={() => onDelete(radiator)}
                         icon={Trash2}
                         className="p-1 text-red-600 hover:text-red-800"
+                        title="Delete Radiator"
                       />
                     </>
                   )}

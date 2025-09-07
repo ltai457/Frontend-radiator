@@ -1,5 +1,5 @@
 import React from 'react';
-import { Package, Plus, Search } from 'lucide-react';
+import { Package, Plus } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useRadiators } from '../../hooks/useRadiators';
 import { useWarehouses } from '../../hooks/useWarehouses';
@@ -45,15 +45,20 @@ const RadiatorList = () => {
     year: 'all'
   });
 
+  // Normalize admin across number/string/array cases
+  const isAdmin =
+    user?.role === 1 ||
+    user?.role === '1' ||
+    user?.role === 'Admin' ||
+    user?.role === 'admin' ||
+    (Array.isArray(user?.role) && user.role.map(String).some(r => r.toLowerCase() === 'admin' || r === '1'));
+
   const handleAddRadiator = async (radiatorData) => {
     try {
       const result = await createRadiator(radiatorData);
       if (result.success) {
         addModal.closeModal();
-        // Refresh the data
-        if (refetch) {
-          await refetch();
-        }
+        if (refetch) await refetch();
         return true;
       } else {
         throw new Error(result.error || 'Failed to create radiator');
@@ -70,10 +75,7 @@ const RadiatorList = () => {
       const result = await updateRadiator(editModal.data.id, radiatorData);
       if (result.success) {
         editModal.closeModal();
-        // Refresh the data
-        if (refetch) {
-          await refetch();
-        }
+        if (refetch) await refetch();
         return true;
       } else {
         throw new Error(result.error || 'Failed to update radiator');
@@ -87,18 +89,13 @@ const RadiatorList = () => {
 
   const handleDeleteRadiator = async (radiator) => {
     const confirmMessage = `Are you sure you want to delete "${radiator.name}"?\n\nThis will also remove all stock levels for this product across all warehouses.\n\nThis action cannot be undone.`;
-    
-    if (!window.confirm(confirmMessage)) {
-      return;
-    }
+    if (!window.confirm(confirmMessage)) return;
     
     try {
       const result = await deleteRadiator(radiator.id);
       if (!result.success) {
         throw new Error(result.error || 'Failed to delete radiator');
       }
-      
-      // Refresh the data
       if (refetch) {
         await refetch();
       } else {
@@ -111,7 +108,6 @@ const RadiatorList = () => {
   };
 
   const handleStockUpdate = async () => {
-    // Refresh data after stock update
     if (refetch) {
       await refetch();
     } else {
@@ -130,11 +126,10 @@ const RadiatorList = () => {
           <h3 className="text-xl font-semibold text-gray-900">Product Catalog</h3>
           <p className="text-sm text-gray-600">Manage your radiator inventory</p>
         </div>
-        {user?.role === 'Admin' && (
-          <Button
-            onClick={() => addModal.openModal()}
-            icon={Plus}
-          >
+        
+        {/* Show Add button for admin users */}
+        {isAdmin && (
+          <Button onClick={() => addModal.openModal()} icon={Plus}>
             Add Radiator
           </Button>
         )}
@@ -175,7 +170,7 @@ const RadiatorList = () => {
           onEdit={editModal.openModal}
           onDelete={handleDeleteRadiator}
           onEditStock={stockModal.openModal}
-          userRole={user?.role}
+          isAdmin={isAdmin}
         />
       )}
 

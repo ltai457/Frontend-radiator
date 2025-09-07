@@ -129,6 +129,11 @@ const authService = {
     return false;
   },
 
+  // MISSING FUNCTION: Extend session (alias for refreshSession)
+  extendSession() {
+    return this.refreshSession();
+  },
+
   // Check session status with detailed info
   getSessionInfo() {
     const loginTime = sessionStorage.getItem('loginTime');
