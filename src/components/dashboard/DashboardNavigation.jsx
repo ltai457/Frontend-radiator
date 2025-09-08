@@ -7,7 +7,8 @@ const DashboardNavigation = ({ activeTab, onTabChange }) => {
     { id: 'sales', label: 'Sales' },
     { id: 'customers', label: 'Customers' },
     { id: 'inventory', label: 'Inventory' },
-    { id: 'stock', label: 'Stock' }
+    { id: 'stock', label: 'Stock' } ,
+    { id: 'warehouses', label: 'Warehouses' } // Uncomment if warehouse management is added
   ];
 
   return (

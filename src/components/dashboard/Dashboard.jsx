@@ -19,21 +19,25 @@ const Dashboard = () => {
     navigate('/login');
   };
 
-  const renderContent = () => {
-    switch (activeTab) {
-      case 'sales':
-        return <SalesManagement />;
-      case 'customers':
-        return <CustomerList />;
-      case 'inventory':
-        return <RadiatorList />;
-      case 'stock':
-        return <WarehouseStock />;
-      case 'overview':
-      default:
-        return <DashboardOverview onNavigate={setActiveTab} />;
-    }
-  };
+  // In your main Dashboard component
+const renderContent = () => {
+  switch (activeTab) {
+    case 'overview':
+      return <DashboardOverview onNavigate={setActiveTab} />;
+    case 'sales':
+      return <SalesManagement />;
+    case 'customers':
+      return <CustomerManagement />;
+    case 'inventory':
+      return <RadiatorList />;
+    case 'warehouses':
+      return <WarehouseManagement />; // New warehouse management
+    case 'stock':
+      return <WarehouseStock />; // New stock management
+    default:
+      return <DashboardOverview onNavigate={setActiveTab} />;
+  }
+};
 
   return (
     <div className="min-h-screen bg-gray-100">
