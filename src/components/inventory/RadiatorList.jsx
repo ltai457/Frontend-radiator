@@ -13,7 +13,7 @@ import RadiatorTable from './RadiatorTable';
 import RadiatorStats from './RadiatorStats';
 import AddRadiatorModal from './modals/AddRadiatorModal';
 import EditRadiatorModal from './modals/EditRadiatorModal';
-import StockUpdateModal from './modals/StockUpdateModal';
+import StockUpdateModal from '../warehouse/modals/StockUpdateModal';
 
 const RadiatorList = () => {
   const { user } = useAuth();

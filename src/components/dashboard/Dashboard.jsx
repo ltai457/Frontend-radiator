@@ -7,7 +7,7 @@ import DashboardOverview from './DashboardOverview';
 import CustomerList from '../customers/CustomerList';
 import SalesManagement from '../sales/SalesManagement';
 import RadiatorList from '../inventory/RadiatorList';
-import WarehouseStock from '../inventory/WarehouseStock';
+import WarehouseStock from '../warehouse/WarehouseStock';
 
 const Dashboard = () => {
   const { user, logout } = useAuth();

@@ -1,4 +1,4 @@
-// src/api/radiatorService.js
+// src/api/warehouseService.js
 import axios from 'axios';
 import authService from './authService';
 
@@ -25,144 +25,153 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (response) => {
     if (import.meta.env.VITE_DEBUG === 'true') {
-      console.log('✅ Radiator API Success:', response.config.method.toUpperCase(), response.config.url, response.status);
+      console.log('✅ Warehouse API Success:', response.config.method.toUpperCase(), response.config.url, response.status);
     }
     return response;
   },
   (error) => {
-    console.error('❌ Radiator API Error:', error.config?.method?.toUpperCase(), error.config?.url, error.response?.status, error.response?.data);
+    console.error('❌ Warehouse API Error:', error.config?.method?.toUpperCase(), error.config?.url, error.response?.status, error.response?.data);
     return Promise.reject(error);
   }
 );
 
-const radiatorService = {
-  // Create new radiator (with optional initial stock)
-  async create(radiatorData) {
+const warehouseService = {
+  // Get all warehouses
+  async getAll() {
     try {
-      console.log('🚀 Creating radiator with data:', radiatorData);
+      console.log('📊 Fetching all warehouses...');
+      const response = await api.get('/warehouses');
+      console.log('✅ Warehouses loaded:', response.data.length, 'items');
+      return { success: true, data: response.data };
+    } catch (error) {
+      console.error('❌ Get warehouses error:', error.response?.data || error.message);
+      return { 
+        success: false, 
+        error: error.response?.data?.message || 'Failed to fetch warehouses - check API connection' 
+      };
+    }
+  },
+
+  // Get single warehouse by ID
+  async getById(id) {
+    try {
+      console.log('📊 Fetching warehouse by ID:', id);
+      const response = await api.get(`/warehouses/${id}`);
+      console.log('✅ Warehouse loaded:', response.data);
+      return { success: true, data: response.data };
+    } catch (error) {
+      console.error('❌ Get warehouse by ID error:', error.response?.data || error.message);
+      return { 
+        success: false, 
+        error: error.response?.data?.message || 'Failed to fetch warehouse - check API connection' 
+      };
+    }
+  },
+
+  // Get warehouse by code
+  async getByCode(code) {
+    try {
+      console.log('📊 Fetching warehouse by code:', code);
+      const response = await api.get(`/warehouses/code/${code}`);
+      console.log('✅ Warehouse loaded:', response.data);
+      return { success: true, data: response.data };
+    } catch (error) {
+      console.error('❌ Get warehouse by code error:', error.response?.data || error.message);
+      return { 
+        success: false, 
+        error: error.response?.data?.message || 'Failed to fetch warehouse by code' 
+      };
+    }
+  },
+
+  // Create new warehouse
+  async create(warehouseData) {
+    try {
+      console.log('🚀 Creating warehouse with data:', warehouseData);
       
       // Ensure the data format matches your backend DTO
       const payload = {
-        brand: radiatorData.brand,
-        code: radiatorData.code,
-        name: radiatorData.name,
-        year: radiatorData.year,
-        ...(radiatorData.initialStock && Object.keys(radiatorData.initialStock).length > 0 && {
-          initialStock: radiatorData.initialStock
-        })
+        name: warehouseData.name.trim(),
+        code: warehouseData.code.trim().toUpperCase(),
+        location: warehouseData.location?.trim() || null,
+        address: warehouseData.address?.trim() || null,
+        phone: warehouseData.phone?.trim() || null,
+        email: warehouseData.email?.trim() || null
       };
       
-      console.log('📤 Sending payload:', payload);
+      console.log('📤 Sending warehouse payload:', payload);
       
-      const response = await api.post('/radiators', payload);
+      const response = await api.post('/warehouses', payload);
       
-      console.log('✅ Create radiator response:', response.data);
+      console.log('✅ Create warehouse response:', response.data);
       
       return { success: true, data: response.data };
     } catch (error) {
-      console.error('❌ Create radiator error:', error.response?.data || error.message);
+      console.error('❌ Create warehouse error:', error.response?.data || error.message);
       return { 
         success: false, 
-        error: error.response?.data?.message || error.message || 'Failed to create radiator - check API connection' 
+        error: error.response?.data?.message || error.message || 'Failed to create warehouse - check API connection' 
       };
     }
   },
 
-  // Get all radiators
-  async getAll() {
+  // Update warehouse
+  async update(id, warehouseData) {
     try {
-      console.log('📊 Fetching all radiators...');
-      const response = await api.get('/radiators');
-      console.log('✅ Radiators loaded:', response.data.length, 'items');
+      console.log('📝 Updating warehouse:', id, warehouseData);
+      
+      const payload = {
+        name: warehouseData.name.trim(),
+        code: warehouseData.code.trim().toUpperCase(),
+        location: warehouseData.location?.trim() || null,
+        address: warehouseData.address?.trim() || null,
+        phone: warehouseData.phone?.trim() || null,
+        email: warehouseData.email?.trim() || null
+      };
+      
+      const response = await api.put(`/warehouses/${id}`, payload);
+      console.log('✅ Warehouse updated:', response.data);
       return { success: true, data: response.data };
     } catch (error) {
-      console.error('❌ Get radiators error:', error.response?.data || error.message);
+      console.error('❌ Update warehouse error:', error.response?.data || error.message);
       return { 
         success: false, 
-        error: error.response?.data?.message || 'Failed to fetch radiators - check API connection' 
+        error: error.response?.data?.message || error.message || 'Failed to update warehouse' 
       };
     }
   },
 
-  // Get single radiator by ID
-  async getById(id) {
-    try {
-      console.log('📊 Fetching radiator by ID:', id);
-      const response = await api.get(`/radiators/${id}`);
-      console.log('✅ Radiator loaded:', response.data);
-      return { success: true, data: response.data };
-    } catch (error) {
-      console.error('❌ Get radiator by ID error:', error.response?.data || error.message);
-      return { 
-        success: false, 
-        error: error.response?.data?.message || 'Failed to fetch radiator - check API connection' 
-      };
-    }
-  },
-
-  // Update radiator
-  async update(id, radiatorData) {
-    try {
-      console.log('📝 Updating radiator:', id, radiatorData);
-      const response = await api.put(`/radiators/${id}`, radiatorData);
-      console.log('✅ Radiator updated:', response.data);
-      return { success: true, data: response.data };
-    } catch (error) {
-      console.error('❌ Update radiator error:', error.response?.data || error.message);
-      return { 
-        success: false, 
-        error: error.response?.data?.message || error.message || 'Failed to update radiator' 
-      };
-    }
-  },
-
-  // Delete radiator
+  // Delete warehouse
   async delete(id) {
     try {
-      console.log('🗑️ Deleting radiator:', id);
-      await api.delete(`/radiators/${id}`);
-      console.log('✅ Radiator deleted:', id);
+      console.log('🗑️ Deleting warehouse:', id);
+      await api.delete(`/warehouses/${id}`);
+      console.log('✅ Warehouse deleted:', id);
       return { success: true };
     } catch (error) {
-      console.error('❌ Delete radiator error:', error.response?.data || error.message);
+      console.error('❌ Delete warehouse error:', error.response?.data || error.message);
       return { 
         success: false, 
-        error: error.response?.data?.message || error.message || 'Failed to delete radiator' 
+        error: error.response?.data?.message || error.message || 'Failed to delete warehouse' 
       };
     }
   },
 
-  // Search radiators
-  async search(searchTerm) {
+  // Validate warehouse code (check if code is available)
+  async validateCode(code) {
     try {
-      console.log('🔍 Searching radiators:', searchTerm);
-      const response = await api.get(`/radiators/search?q=${encodeURIComponent(searchTerm)}`);
-      console.log('✅ Search results:', response.data.length, 'items');
+      console.log('🔍 Validating warehouse code:', code);
+      const response = await api.get(`/warehouses/validate-code/${code.toUpperCase()}`);
+      console.log('✅ Code validation result:', response.data);
       return { success: true, data: response.data };
     } catch (error) {
-      console.error('❌ Search radiators error:', error.response?.data || error.message);
+      console.error('❌ Validate code error:', error.response?.data || error.message);
       return { 
         success: false, 
-        error: error.response?.data?.message || 'Failed to search radiators' 
-      };
-    }
-  },
-
-  // Get radiator stock levels across all warehouses
-  async getStockLevels(radiatorId) {
-    try {
-      console.log('📦 Fetching stock levels for radiator:', radiatorId);
-      const response = await api.get(`/radiators/${radiatorId}/stock`);
-      console.log('✅ Stock levels loaded:', response.data);
-      return { success: true, data: response.data };
-    } catch (error) {
-      console.error('❌ Get stock levels error:', error.response?.data || error.message);
-      return { 
-        success: false, 
-        error: error.response?.data?.message || 'Failed to fetch stock levels' 
+        error: error.response?.data?.message || 'Failed to validate warehouse code' 
       };
     }
   }
 };
 
-export default radiatorService;
+export default warehouseService;
