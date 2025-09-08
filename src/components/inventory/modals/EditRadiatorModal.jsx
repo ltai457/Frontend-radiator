@@ -152,25 +152,7 @@ const EditRadiatorModal = ({ isOpen, onClose, onSuccess, radiator }) => {
           </div>
         </div>
 
-        {/* Show current stock levels (read-only) */}
-        {radiator.stock && Object.keys(radiator.stock).length > 0 && (
-          <div className="space-y-3">
-            <div className="text-sm font-medium text-gray-900">Current Stock Levels</div>
-            <div className="bg-gray-50 rounded-lg p-3">
-              <div className="grid grid-cols-2 gap-2 text-sm">
-                {Object.entries(radiator.stock).map(([warehouseCode, qty]) => (
-                  <div key={warehouseCode} className="flex justify-between">
-                    <span className="text-gray-600">{warehouseCode}:</span>
-                    <span className="font-medium">{qty} units</span>
-                  </div>
-                ))}
-              </div>
-              <div className="text-xs text-gray-500 mt-2">
-                Note: Use the stock management tab to update quantities
-              </div>
-            </div>
-          </div>
-        )}
+
 
         <div className="flex justify-end gap-2 pt-4 border-t border-gray-200">
           <Button variant="outline" onClick={handleClose} disabled={saving}>

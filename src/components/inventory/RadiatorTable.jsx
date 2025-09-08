@@ -46,9 +46,9 @@ const RadiatorTable = ({
           <TableHead className="table-cell text-center align-middle">
             Year
           </TableHead>
-          <TableHead className="table-cell w-40 text-center align-middle">
+          {/* <TableHead className="table-cell w-40 text-center align-middle">
             Stock
-          </TableHead>
+          </TableHead> */}
           <TableHead className="table-cell w-50 text-center align-middle">
             Actions
           </TableHead>
@@ -80,7 +80,7 @@ const RadiatorTable = ({
               </TableCell>
 
               {/* STOCK — centered */}
-              <TableCell className="text-center align-middle">
+              {/* <TableCell className="text-center align-middle">
                 <div
                   className={`text-sm font-medium ${getStockColor(totalStock)}`}
                 >
@@ -95,7 +95,7 @@ const RadiatorTable = ({
                     ))}
                   </div>
                 )}
-              </TableCell>
+              </TableCell>  */}
 
               {/* ACTIONS — centered */}
               <TableCell className="text-center align-middle">
