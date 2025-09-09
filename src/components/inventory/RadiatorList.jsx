@@ -1,5 +1,5 @@
-import React from 'react';
-import { Package, Plus } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { Package, Plus, List as ListIcon, Grid as GridIcon } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useRadiators } from '../../hooks/useRadiators';
 import { useWarehouses } from '../../hooks/useWarehouses';
@@ -10,10 +10,10 @@ import { Button } from '../common/ui/Button';
 import { EmptyState } from '../common/layout/EmptyState';
 import RadiatorFilters from './RadiatorFilters';
 import RadiatorTable from './RadiatorTable';
+import RadiatorCards from './RadiatorCards'; // ⬅️ NEW
 import RadiatorStats from './RadiatorStats';
 import AddRadiatorModal from './modals/AddRadiatorModal';
 import EditRadiatorModal from './modals/EditRadiatorModal';
-/* import StockUpdateModal from '../warehouse/modals/StockUpdateModal'; */
 
 const RadiatorList = () => {
   const { user } = useAuth();
@@ -44,6 +44,12 @@ const RadiatorList = () => {
     brand: 'all',
     year: 'all'
   });
+
+  // remember last chosen view
+  const [viewMode, setViewMode] = useState(() => localStorage.getItem('radiatorViewMode') || 'list');
+  useEffect(() => {
+    localStorage.setItem('radiatorViewMode', viewMode);
+  }, [viewMode]);
 
   // Normalize admin across number/string/array cases
   const isAdmin =
@@ -126,13 +132,33 @@ const RadiatorList = () => {
           <h3 className="text-xl font-semibold text-gray-900">Product Catalog</h3>
           <p className="text-sm text-gray-600">Manage your radiator inventory</p>
         </div>
-        
-        {/* Show Add button for admin users */}
-        {isAdmin && (
-          <Button onClick={() => addModal.openModal()} icon={Plus}>
-            Add Radiator
+
+        <div className="flex items-center gap-2">
+          {/* view toggle */}
+          <Button
+            variant={viewMode === 'list' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setViewMode('list')}
+            icon={ListIcon}
+          >
+            List
           </Button>
-        )}
+          <Button
+            variant={viewMode === 'card' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setViewMode('card')}
+            icon={GridIcon}
+          >
+            Card
+          </Button>
+
+          {/* add button for admin */}
+          {isAdmin && (
+            <Button onClick={() => addModal.openModal()} icon={Plus}>
+              Add Radiator
+            </Button>
+          )}
+        </div>
       </div>
 
       <RadiatorStats radiators={radiators} />
@@ -165,13 +191,23 @@ const RadiatorList = () => {
           onAction={clearFilters}
         />
       ) : (
-        <RadiatorTable
-          radiators={filteredRadiators}
-          onEdit={editModal.openModal}
-          onDelete={handleDeleteRadiator}
-          onEditStock={stockModal.openModal}
-          isAdmin={isAdmin}
-        />
+        viewMode === 'list' ? (
+          <RadiatorTable
+            radiators={filteredRadiators}
+            onEdit={editModal.openModal}
+            onDelete={handleDeleteRadiator}
+            onEditStock={stockModal.openModal}
+            isAdmin={isAdmin}
+          />
+        ) : (
+          <RadiatorCards
+            radiators={filteredRadiators}
+            onEdit={editModal.openModal}
+            onDelete={handleDeleteRadiator}
+            onEditStock={stockModal.openModal}
+            isAdmin={isAdmin}
+          />
+        )
       )}
 
       {/* Modals */}
@@ -188,8 +224,6 @@ const RadiatorList = () => {
         onSuccess={handleEditRadiator}
         radiator={editModal.data}
       />
-      
-      
     </div>
   );
 };

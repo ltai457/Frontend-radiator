@@ -1,70 +1,170 @@
 // src/components/warehouse/WarehouseManagement.jsx
-import React, { useState } from 'react';
-import { Warehouse, Plus, Edit, Trash2, MapPin, Phone, Mail, AlertCircle } from 'lucide-react';
-import { useAuth } from '../../contexts/AuthContext';
-import { useWarehouses } from '../../hooks/useWarehouses';
-import { LoadingSpinner } from '../common/ui/LoadingSpinner';
-import { EmptyState } from '../common/layout/EmptyState';
-import { Button } from '../common/ui/Button';
-import { useModal } from '../../hooks/useModal';
-import WarehouseCard from './components/WarehouseCard';
-import CreateWarehouseModal from './modals/CreateWarehouseModal';
-import EditWarehouseModal from './modals/EditWarehouseModal';
-import ConfirmDeleteModal from '../common/modals/ConfirmDeleteModal';
+import React, { useMemo, useState } from "react";
+import { AlertCircle, Warehouse as WarehouseIcon } from "lucide-react";
+import { useAuth } from "../../contexts/AuthContext";
+import { useWarehouses } from "../../hooks/useWarehouses";
+import { useModal } from "../../hooks/useModal";
+import { LoadingSpinner } from "../common/ui/LoadingSpinner";
+import { EmptyState } from "../common/layout/EmptyState";
+
+import WarehouseHeader from "./sections/WarehouseHeader";
+import WarehouseStats from "./sections/WarehouseStats";
+import WarehouseToolbar from "./sections/WarehouseToolbar";
+import WarehouseTable from "./views/WarehouseTable";
+import WarehouseCards from "./views/WarehouseCards";
+
+
+import CreateWarehouseModal from "./modals/CreateWarehouseModal";
+import EditWarehouseModal from "./modals/EditWarehouseModal";
+import ConfirmDeleteModal from "../common/modals/ConfirmDeleteModal";
 
 const WarehouseManagement = () => {
   const { user } = useAuth();
-  const { 
-    warehouses, 
-    loading, 
+  const {
+    warehouses,
+    loading,
     error,
-    createWarehouse, 
-    updateWarehouse, 
-    deleteWarehouse 
+    createWarehouse,
+    updateWarehouse,
+    deleteWarehouse,
+    refetch,
   } = useWarehouses();
-  
+
+  // ---- UI state (no helper hook needed)
+  const [searchTerm, setSearchTerm] = useState("");
+  const [viewMode, setViewMode] = useState("table"); // 'table' | 'cards'
+  const [sortBy, setSortBy] = useState("name");      // 'name' | 'code' | 'location' | 'updatedAt'
+  const [sortOrder, setSortOrder] = useState("asc"); // 'asc' | 'desc'
+  const [actionLoading, setActionLoading] = useState(false);
+
   const createModal = useModal();
   const editModal = useModal();
   const deleteModal = useModal();
+  const viewModal = useModal();
 
-  const [actionLoading, setActionLoading] = useState(false);
+  const isAdmin = user?.role === "Admin" || user?.role?.includes?.("Admin");
 
-  // Check if user has admin privileges
-  const isAdmin = user?.role === 'Admin' || user?.role?.includes?.('Admin');
+  // ---- defensive base list
+  const list = Array.isArray(warehouses) ? warehouses : [];
 
-  const handleCreateWarehouse = async (warehouseData) => {
+  // ---- derived: processed list
+  const processedWarehouses = useMemo(() => {
+    const term = searchTerm.trim().toLowerCase();
+
+    let filtered = term
+      ? list.filter((w) =>
+          [w?.name, w?.code, w?.location, w?.address, w?.phone, w?.email]
+            .filter(Boolean)
+            .some((v) => String(v).toLowerCase().includes(term))
+        )
+      : list;
+
+    const sorted = [...filtered].sort((a, b) => {
+      let aVal = a?.[sortBy];
+      let bVal = b?.[sortBy];
+
+      if (sortBy === "updatedAt") {
+        aVal = a?.updatedAt || a?.createdAt;
+        bVal = b?.updatedAt || b?.createdAt;
+      }
+
+      if (!aVal && !bVal) return 0;
+      if (!aVal) return sortOrder === "asc" ? 1 : -1;
+      if (!bVal) return sortOrder === "asc" ? -1 : 1;
+
+      if (sortBy === "updatedAt") {
+        aVal = new Date(aVal).getTime();
+        bVal = new Date(bVal).getTime();
+      } else {
+        if (typeof aVal === "string") aVal = aVal.toLowerCase();
+        if (typeof bVal === "string") bVal = bVal.toLowerCase();
+      }
+
+      if (aVal < bVal) return sortOrder === "asc" ? -1 : 1;
+      if (aVal > bVal) return sortOrder === "asc" ? 1 : -1;
+      return 0;
+    });
+
+    return sorted;
+  }, [list, searchTerm, sortBy, sortOrder]);
+
+  // one-safe alias used everywhere in JSX
+  const items = Array.isArray(processedWarehouses) ? processedWarehouses : [];
+
+  // ---- derived: stats (defensive)
+  const stats = useMemo(() => {
+    const activeWarehouses = list.filter((w) => w?.status !== "inactive").length;
+    const uniqueLocations = new Set(
+      list.map((w) => w?.location?.split(",")[0]?.trim()).filter(Boolean)
+    ).size;
+    const lastUpdate =
+      list.length > 0
+        ? new Date(
+            Math.max(
+              ...list.map((w) => new Date(w?.updatedAt || w?.createdAt || 0))
+            )
+          )
+        : null;
+
+    return { total: list.length, activeWarehouses, uniqueLocations, lastUpdate };
+  }, [list]);
+
+  // ---- handlers
+  const handleSort = (column) => {
+    if (sortBy === column) setSortOrder((o) => (o === "asc" ? "desc" : "asc"));
+    else {
+      setSortBy(column);
+      setSortOrder("asc");
+    }
+  };
+
+  const handleExport = () => {
+    const dataStr = JSON.stringify(items, null, 2);
+    const dataUri =
+      "data:application/json;charset=utf-8," + encodeURIComponent(dataStr);
+    const exportFileDefaultName = `warehouses_${
+      new Date().toISOString().split("T")[0]
+    }.json`;
+    const a = document.createElement("a");
+    a.href = dataUri;
+    a.download = exportFileDefaultName;
+    a.click();
+  };
+
+  const handleCreateWarehouse = async (payload) => {
     try {
       setActionLoading(true);
-      const result = await createWarehouse(warehouseData);
-      
-      if (result.success) {
+      const result = await createWarehouse(payload);
+      if (result?.success) {
         createModal.closeModal();
+        await refetch();
         return true;
-      } else {
-        throw new Error(result.error || 'Failed to create warehouse');
       }
-    } catch (error) {
-      console.error('Create warehouse failed:', error);
-      throw error;
+      throw new Error(result?.error || "Failed to create warehouse");
+    } catch (e) {
+      console.error("Create warehouse failed:", e);
+      alert(`Failed to create warehouse: ${e.message}`);
+      throw e;
     } finally {
       setActionLoading(false);
     }
   };
 
-  const handleEditWarehouse = async (warehouseData) => {
+  const handleUpdateWarehouse = async (payload) => {
     try {
       setActionLoading(true);
-      const result = await updateWarehouse(editModal.data.id, warehouseData);
-      
-      if (result.success) {
+      const id = editModal?.data?.id;
+      const result = await updateWarehouse(id, payload);
+      if (result?.success) {
         editModal.closeModal();
+        await refetch();
         return true;
-      } else {
-        throw new Error(result.error || 'Failed to update warehouse');
       }
-    } catch (error) {
-      console.error('Update warehouse failed:', error);
-      throw error;
+      throw new Error(result?.error || "Failed to update warehouse");
+    } catch (e) {
+      console.error("Update warehouse failed:", e);
+      alert(`Failed to update warehouse: ${e.message}`);
+      throw e;
     } finally {
       setActionLoading(false);
     }
@@ -73,24 +173,24 @@ const WarehouseManagement = () => {
   const handleDeleteWarehouse = async () => {
     try {
       setActionLoading(true);
-      const result = await deleteWarehouse(deleteModal.data.id);
-      
-      if (result.success) {
+      const id = deleteModal?.data?.id;
+      const result = await deleteWarehouse(id);
+      if (result?.success) {
         deleteModal.closeModal();
+        await refetch();
       } else {
-        throw new Error(result.error || 'Failed to delete warehouse');
+        throw new Error(result?.error || "Failed to delete warehouse");
       }
-    } catch (error) {
-      console.error('Delete warehouse failed:', error);
-      alert(`Failed to delete warehouse: ${error.message}`);
+    } catch (e) {
+      console.error("Delete warehouse failed:", e);
+      alert(`Failed to delete warehouse: ${e.message}`);
     } finally {
       setActionLoading(false);
     }
   };
 
-  if (loading) {
-    return <LoadingSpinner size="lg" text="Loading warehouses..." />;
-  }
+  // ---- loading / error
+  if (loading) return <LoadingSpinner size="lg" text="Loading warehouses..." />;
 
   if (error) {
     return (
@@ -99,61 +199,80 @@ const WarehouseManagement = () => {
           <div className="flex items-center gap-3">
             <AlertCircle className="w-5 h-5 text-red-600" />
             <div>
-              <h3 className="font-medium text-red-800">Error loading warehouses</h3>
+              <h3 className="font-medium text-red-800">
+                Error loading warehouses
+              </h3>
               <p className="text-sm text-red-700 mt-1">{error}</p>
             </div>
+          </div>
+          <div className="mt-4">
+            <button
+              onClick={refetch}
+              className="px-3 py-1 text-sm border rounded-md"
+            >
+              Try Again
+            </button>
           </div>
         </div>
       </div>
     );
   }
 
+  // ---- render
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900">Warehouse Management</h2>
-          <p className="text-sm text-gray-600">
-            Manage your warehouse locations and distribution centers
-          </p>
-        </div>
-        {isAdmin && (
-          <Button 
-            onClick={createModal.openModal} 
-            className="flex items-center gap-2"
-          >
-            <Plus className="w-4 h-4" />
-            Add Warehouse
-          </Button>
-        )}
-      </div>
+      <WarehouseHeader
+        isAdmin={isAdmin}
+        onCreate={createModal.openModal}
+        onExport={handleExport}
+      />
 
-      {/* Content */}
-      {warehouses.length === 0 ? (
+      <WarehouseStats stats={stats} />
+
+      <WarehouseToolbar
+        searchTerm={searchTerm}
+        onSearch={setSearchTerm}
+        viewMode={viewMode}
+        onViewChange={setViewMode}
+        resultCount={searchTerm ? items.length : undefined}
+      />
+
+      {items.length === 0 ? (
         <EmptyState
-          icon={Warehouse}
-          title="No Warehouses Found"
-          description="Get started by creating your first warehouse location"
-          action={isAdmin}
+          icon={WarehouseIcon}
+          title={searchTerm ? "No warehouses found" : "No Warehouses Yet"}
+          description={
+            searchTerm
+              ? "Try adjusting your search terms"
+              : "Get started by creating your first warehouse location"
+          }
+          action={isAdmin && !searchTerm}
           actionLabel="Create Warehouse"
           onAction={createModal.openModal}
         />
+      ) : viewMode === "table" ? (
+        <WarehouseTable
+          items={items}
+          sortBy={sortBy}
+          sortOrder={sortOrder}
+          onSort={handleSort}
+          isAdmin={isAdmin}
+          onView={viewModal.openModal}
+          onEdit={editModal.openModal}
+          onDelete={deleteModal.openModal}
+        />
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {warehouses.map((warehouse) => (
-            <WarehouseCard
-              key={warehouse.id}
-              warehouse={warehouse}
-              isAdmin={isAdmin}
-              onEdit={(warehouse) => editModal.openModal(warehouse)}
-              onDelete={(warehouse) => deleteModal.openModal(warehouse)}
-            />
-          ))}
-        </div>
+        <WarehouseCards
+          items={items}
+          isAdmin={isAdmin}
+          onView={viewModal.openModal}
+          onEdit={editModal.openModal}
+          onDelete={deleteModal.openModal}
+        />
       )}
 
-      {/* Modals */}
+    
+
       <CreateWarehouseModal
         isOpen={createModal.isOpen}
         onClose={createModal.closeModal}
@@ -163,7 +282,7 @@ const WarehouseManagement = () => {
       <EditWarehouseModal
         isOpen={editModal.isOpen}
         onClose={editModal.closeModal}
-        onSuccess={handleEditWarehouse}
+        onSuccess={handleUpdateWarehouse}
         warehouse={editModal.data}
       />
 

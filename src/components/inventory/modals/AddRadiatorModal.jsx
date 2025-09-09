@@ -8,6 +8,10 @@ const emptyForm = {
   code: "",
   name: "",
   year: "",
+  retailPrice: "",
+  tradePrice: "",
+  isPriceOverridable: false,
+  maxDiscountPercent: "",
 };
 
 const AddRadiatorModal = ({ isOpen, onClose, onSuccess, warehouses = [] }) => {
@@ -41,6 +45,8 @@ const AddRadiatorModal = ({ isOpen, onClose, onSuccess, warehouses = [] }) => {
     setInitialStock((prev) => ({ ...prev, [code]: qty }));
   };
 
+  const num = (v) => (v === "" || v === null || v === undefined ? null : Number(v));
+
   const validate = () => {
     if (!form.brand?.trim()) return "Brand is required.";
     if (!form.code?.trim()) return "Code is required.";
@@ -49,6 +55,15 @@ const AddRadiatorModal = ({ isOpen, onClose, onSuccess, warehouses = [] }) => {
     if (Number(form.year) < 1900 || Number(form.year) > new Date().getFullYear() + 5) {
       return "Year must be between 1900 and " + (new Date().getFullYear() + 5);
     }
+
+    const rp = num(form.retailPrice);
+    const tp = num(form.tradePrice);
+    const md = num(form.maxDiscountPercent);
+
+    if (rp !== null && (isNaN(rp) || rp < 0)) return "Retail price must be ≥ 0.";
+    if (tp !== null && (isNaN(tp) || tp < 0)) return "Trade price must be ≥ 0.";
+    if (md !== null && (isNaN(md) || md < 0 || md > 100)) return "Max discount must be between 0 and 100.";
+
     return "";
   };
 
@@ -68,17 +83,21 @@ const AddRadiatorModal = ({ isOpen, onClose, onSuccess, warehouses = [] }) => {
         code: form.code.trim(),
         name: form.name.trim(),
         year: Number(form.year),
+
+        // New: pricing fields
+        retailPrice: num(form.retailPrice),
+        tradePrice: num(form.tradePrice),
+        isPriceOverridable: !!form.isPriceOverridable,
+        maxDiscountPercent: num(form.maxDiscountPercent),
+
         // Include initial stock if warehouses are provided
-        ...(warehouses.length > 0 && { stock: initialStock })
+        ...(warehouses.length > 0 && { stock: initialStock }),
       };
 
-      // Call the onSuccess function which should handle the API call
       const success = await onSuccess(payload);
-      if (!success) {
-        throw new Error("Failed to create radiator");
-      }
+      if (!success) throw new Error("Failed to create radiator");
     } catch (e) {
-      console.error('Error creating radiator:', e);
+      console.error("Error creating radiator:", e);
       setError(e.message || "Failed to create radiator");
     } finally {
       setSaving(false);
@@ -159,6 +178,44 @@ const AddRadiatorModal = ({ isOpen, onClose, onSuccess, warehouses = [] }) => {
               max={new Date().getFullYear() + 5}
               disabled={saving}
             />
+          </div>
+        </div>
+
+        {/* Pricing */}
+        <div className="space-y-3">
+          <div className="text-sm font-medium text-gray-900">Pricing</div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Retail Price ($)</label>
+              <input
+                type="number"
+                min={0}
+                step="0.01"
+                value={form.retailPrice}
+                onChange={(e) => updateField("retailPrice", e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                placeholder="e.g., 149.99"
+                disabled={saving}
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Trade Price ($)</label>
+              <input
+                type="number"
+                min={0}
+                step="0.01"
+                value={form.tradePrice}
+                onChange={(e) => updateField("tradePrice", e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                placeholder="e.g., 129.99"
+                disabled={saving}
+              />
+            </div>
+
+            
+
+            
           </div>
         </div>
 

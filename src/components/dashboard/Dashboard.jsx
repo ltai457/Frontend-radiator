@@ -8,7 +8,8 @@ import DashboardOverview from './DashboardOverview';
 import CustomerList from '../customers/CustomerList';
 import SalesManagement from '../sales/SalesManagement';
 import RadiatorList from '../inventory/RadiatorList';
-/* import WarehouseStock from '../warehouse/WarehouseStock'; */
+import WarehouseStock from '../stock/WarehouseStock';
+import WarehouseManagement from '../warehouse/WarehouseManagement'; 
 
 // Check if we're in testing mode
 const TESTING_MODE = true; // Should match the setting in AuthContext
@@ -39,27 +40,13 @@ const Dashboard = () => {
       case 'sales':
         return <SalesManagement />;
       case 'customers':
-        return <CustomerList />; // Fixed: was CustomerManagement
+        return <CustomerList />;
       case 'inventory':
         return <RadiatorList />;
       case 'warehouses':
-        // Uncomment when WarehouseManagement component is available
-        // return <WarehouseManagement />;
-        return (
-          <div className="bg-white rounded-lg shadow p-6">
-            <h2 className="text-xl font-semibold mb-4">Warehouse Management</h2>
-            <p className="text-gray-600">Warehouse management component is under development.</p>
-          </div>
-        );
+        return <WarehouseManagement />;
       case 'stock':
-        // Uncomment when WarehouseStock component is available
-        // return <WarehouseStock />;
-        return (
-          <div className="bg-white rounded-lg shadow p-6">
-            <h2 className="text-xl font-semibold mb-4">Stock Management</h2>
-            <p className="text-gray-600">Stock management component is under development.</p>
-          </div>
-        );
+        return <WarehouseStock />;
       default:
         return <DashboardOverview onNavigate={setActiveTab} />;
     }

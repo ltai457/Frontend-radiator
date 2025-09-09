@@ -10,6 +10,12 @@ import {
 } from "../common/ui/Table";
 import { Button } from "../common/ui/Button";
 
+// Money formatter
+const fmtMoney = (n) =>
+  (n ?? n === 0)
+    ? new Intl.NumberFormat(undefined, { style: "currency", currency: "NZD" }).format(n)
+    : "—";
+
 const RadiatorTable = ({
   radiators,
   onEdit,
@@ -31,7 +37,7 @@ const RadiatorTable = ({
   const userIsAdmin = !!isAdmin;
 
   return (
-    <Table className="min-w-[960px] table-auto">
+    <Table className="min-w-[1100px] table-auto">
       <TableHeader className="table-header-group">
         <TableRow className="table-row">
           <TableHead className="table-cell w-36 text-center align-middle">
@@ -46,9 +52,20 @@ const RadiatorTable = ({
           <TableHead className="table-cell text-center align-middle">
             Year
           </TableHead>
-          {/* <TableHead className="table-cell w-40 text-center align-middle">
+
+          {/* New columns */}
+          <TableHead className="table-cell text-center align-middle">
+            Retail
+          </TableHead>
+          <TableHead className="table-cell text-center align-middle">
+            Trade
+          </TableHead>
+
+          {/* Stock */}
+          <TableHead className="table-cell w-40 text-center align-middle">
             Stock
-          </TableHead> */}
+          </TableHead>
+
           <TableHead className="table-cell w-50 text-center align-middle">
             Actions
           </TableHead>
@@ -79,8 +96,24 @@ const RadiatorTable = ({
                 <div className="text-sm text-gray-900">{radiator.year}</div>
               </TableCell>
 
-              {/* STOCK — centered */}
-              {/* <TableCell className="text-center align-middle">
+              {/* Retail Price */}
+              <TableCell className="text-center align-middle">
+                <div className="text-sm text-gray-900">
+                  {fmtMoney(radiator.retailPrice)}
+                </div>
+               
+              </TableCell>
+
+              {/* Trade Price */}
+              <TableCell className="text-center align-middle">
+                <div className="text-sm text-gray-900">
+                  {fmtMoney(radiator.tradePrice)}
+                </div>
+                
+              </TableCell>
+
+              {/* Stock */}
+              <TableCell className="text-center align-middle">
                 <div
                   className={`text-sm font-medium ${getStockColor(totalStock)}`}
                 >
@@ -95,9 +128,9 @@ const RadiatorTable = ({
                     ))}
                   </div>
                 )}
-              </TableCell>  */}
+              </TableCell>
 
-              {/* ACTIONS — centered */}
+              {/* Actions */}
               <TableCell className="text-center align-middle">
                 <div className="inline-flex items-center justify-center gap-2">
                   <Button

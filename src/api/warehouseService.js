@@ -31,6 +31,12 @@ api.interceptors.response.use(
   },
   (error) => {
     console.error('❌ Warehouse API Error:', error.config?.method?.toUpperCase(), error.config?.url, error.response?.status, error.response?.data);
+    
+    // Log validation errors specifically
+    if (error.response?.data?.errors) {
+      console.error('Validation Errors:', error.response.data.errors);
+    }
+    
     return Promise.reject(error);
   }
 );
@@ -89,15 +95,28 @@ const warehouseService = {
     try {
       console.log('🚀 Creating warehouse with data:', warehouseData);
       
-      // Ensure the data format matches your backend DTO
+      // Build payload with required fields
       const payload = {
-        name: warehouseData.name.trim(),
-        code: warehouseData.code.trim().toUpperCase(),
-        location: warehouseData.location?.trim() || null,
-        address: warehouseData.address?.trim() || null,
-        phone: warehouseData.phone?.trim() || null,
-        email: warehouseData.email?.trim() || null
+        name: warehouseData.name?.trim() || '',
+        code: warehouseData.code?.trim()?.toUpperCase() || ''
       };
+      
+      // Add optional fields only if they have values
+      if (warehouseData.location?.trim()) {
+        payload.location = warehouseData.location.trim();
+      }
+      
+      if (warehouseData.address?.trim()) {
+        payload.address = warehouseData.address.trim();
+      }
+      
+      if (warehouseData.phone?.trim()) {
+        payload.phone = warehouseData.phone.trim();
+      }
+      
+      if (warehouseData.email?.trim()) {
+        payload.email = warehouseData.email.trim();
+      }
       
       console.log('📤 Sending warehouse payload:', payload);
       
@@ -108,9 +127,23 @@ const warehouseService = {
       return { success: true, data: response.data };
     } catch (error) {
       console.error('❌ Create warehouse error:', error.response?.data || error.message);
+      
+      // Extract error message
+      let errorMessage = 'Failed to create warehouse';
+      if (error.response?.data?.errors) {
+        const errors = error.response.data.errors;
+        const errorMessages = [];
+        for (const field in errors) {
+          errorMessages.push(`${field}: ${errors[field].join(', ')}`);
+        }
+        errorMessage = errorMessages.join('; ');
+      } else if (error.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      }
+      
       return { 
         success: false, 
-        error: error.response?.data?.message || error.message || 'Failed to create warehouse - check API connection' 
+        error: errorMessage
       };
     }
   },
@@ -120,23 +153,69 @@ const warehouseService = {
     try {
       console.log('📝 Updating warehouse:', id, warehouseData);
       
+      // Build payload with required fields - MUST include both name and code
       const payload = {
-        name: warehouseData.name.trim(),
-        code: warehouseData.code.trim().toUpperCase(),
-        location: warehouseData.location?.trim() || null,
-        address: warehouseData.address?.trim() || null,
-        phone: warehouseData.phone?.trim() || null,
-        email: warehouseData.email?.trim() || null
+        name: warehouseData.name?.trim() || '',
+        code: warehouseData.code?.trim()?.toUpperCase() || ''
       };
+      
+      // Add optional fields only if they have values
+      if (warehouseData.location?.trim()) {
+        payload.location = warehouseData.location.trim();
+      }
+      
+      if (warehouseData.address?.trim()) {
+        payload.address = warehouseData.address.trim();
+      }
+      
+      if (warehouseData.phone?.trim()) {
+        payload.phone = warehouseData.phone.trim();
+      }
+      
+      if (warehouseData.email?.trim()) {
+        payload.email = warehouseData.email.trim();
+      }
+      
+      console.log('📤 Sending update payload:', JSON.stringify(payload, null, 2));
       
       const response = await api.put(`/warehouses/${id}`, payload);
       console.log('✅ Warehouse updated:', response.data);
       return { success: true, data: response.data };
     } catch (error) {
       console.error('❌ Update warehouse error:', error.response?.data || error.message);
+      
+      // Better error message extraction
+      let errorMessage = 'Failed to update warehouse';
+      
+      if (error.response?.data?.errors) {
+        // Handle validation errors from ASP.NET
+        const errors = error.response.data.errors;
+        const errorMessages = [];
+        
+        for (const field in errors) {
+          if (Array.isArray(errors[field])) {
+            // Join all error messages for this field
+            errorMessages.push(`${field}: ${errors[field].join(', ')}`);
+          } else if (typeof errors[field] === 'string') {
+            errorMessages.push(`${field}: ${errors[field]}`);
+          } else {
+            errorMessages.push(`${field}: ${JSON.stringify(errors[field])}`);
+          }
+        }
+        
+        errorMessage = errorMessages.join('; ');
+        console.error('Formatted validation errors:', errorMessage);
+      } else if (error.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      } else if (error.response?.data?.title) {
+        errorMessage = error.response.data.title;
+      } else if (typeof error.response?.data === 'string') {
+        errorMessage = error.response.data;
+      }
+      
       return { 
         success: false, 
-        error: error.response?.data?.message || error.message || 'Failed to update warehouse' 
+        error: errorMessage
       };
     }
   },

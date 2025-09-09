@@ -8,6 +8,10 @@ const emptyForm = {
   code: "",
   name: "",
   year: "",
+  retailPrice: "",
+  tradePrice: "",
+  isPriceOverridable: false,
+  maxDiscountPercent: "",
 };
 
 const EditRadiatorModal = ({ isOpen, onClose, onSuccess, radiator }) => {
@@ -22,6 +26,21 @@ const EditRadiatorModal = ({ isOpen, onClose, onSuccess, radiator }) => {
         code: radiator.code ?? "",
         name: radiator.name ?? "",
         year: radiator.year?.toString() ?? "",
+
+        // New: pricing fields
+        retailPrice:
+          typeof radiator.retailPrice === "number"
+            ? radiator.retailPrice.toString()
+            : "",
+        tradePrice:
+          typeof radiator.tradePrice === "number"
+            ? radiator.tradePrice.toString()
+            : "",
+        isPriceOverridable: !!radiator.isPriceOverridable,
+        maxDiscountPercent:
+          typeof radiator.maxDiscountPercent === "number"
+            ? radiator.maxDiscountPercent.toString()
+            : "",
       });
       setSaving(false);
       setError("");
@@ -34,6 +53,8 @@ const EditRadiatorModal = ({ isOpen, onClose, onSuccess, radiator }) => {
     setForm((prev) => ({ ...prev, [key]: value }));
   };
 
+  const num = (v) => (v === "" || v === null || v === undefined ? null : Number(v));
+
   const validate = () => {
     if (!form.brand?.trim()) return "Brand is required.";
     if (!form.code?.trim()) return "Code is required.";
@@ -42,6 +63,16 @@ const EditRadiatorModal = ({ isOpen, onClose, onSuccess, radiator }) => {
     if (Number(form.year) < 1900 || Number(form.year) > new Date().getFullYear() + 5) {
       return "Year must be between 1900 and " + (new Date().getFullYear() + 5);
     }
+
+    // Pricing validations (optional but if present must be valid)
+    const rp = num(form.retailPrice);
+    const tp = num(form.tradePrice);
+    const md = num(form.maxDiscountPercent);
+
+    if (rp !== null && (isNaN(rp) || rp < 0)) return "Retail price must be ≥ 0.";
+    if (tp !== null && (isNaN(tp) || tp < 0)) return "Trade price must be ≥ 0.";
+    if (md !== null && (isNaN(md) || md < 0 || md > 100)) return "Max discount must be between 0 and 100.";
+
     return "";
   };
 
@@ -61,15 +92,18 @@ const EditRadiatorModal = ({ isOpen, onClose, onSuccess, radiator }) => {
         code: form.code.trim(),
         name: form.name.trim(),
         year: Number(form.year),
+
+        // include pricing fields (nulls become omitted by your API model binder if needed)
+        retailPrice: num(form.retailPrice),
+        tradePrice: num(form.tradePrice),
+        isPriceOverridable: !!form.isPriceOverridable,
+        maxDiscountPercent: num(form.maxDiscountPercent),
       };
 
-      // Call the onSuccess function which should handle the API call
       const success = await onSuccess(payload);
-      if (!success) {
-        throw new Error("Failed to update radiator");
-      }
+      if (!success) throw new Error("Failed to update radiator");
     } catch (e) {
-      console.error('Error updating radiator:', e);
+      console.error("Error updating radiator:", e);
       setError(e.message || "Failed to update radiator");
     } finally {
       setSaving(false);
@@ -92,6 +126,7 @@ const EditRadiatorModal = ({ isOpen, onClose, onSuccess, radiator }) => {
           </div>
         )}
 
+        {/* Basic details */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -152,7 +187,43 @@ const EditRadiatorModal = ({ isOpen, onClose, onSuccess, radiator }) => {
           </div>
         </div>
 
+        {/* Pricing */}
+        <div className="space-y-3">
+          <div className="text-sm font-medium text-gray-900">Pricing</div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Retail Price ($)</label>
+              <input
+                type="number"
+                min={0}
+                step="0.01"
+                value={form.retailPrice}
+                onChange={(e) => updateField("retailPrice", e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                placeholder="e.g., 149.99"
+                disabled={saving}
+              />
+            </div>
 
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Trade Price ($)</label>
+              <input
+                type="number"
+                min={0}
+                step="0.01"
+                value={form.tradePrice}
+                onChange={(e) => updateField("tradePrice", e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                placeholder="e.g., 129.99"
+                disabled={saving}
+              />
+            </div>
+
+            
+
+           
+          </div>
+        </div>
 
         <div className="flex justify-end gap-2 pt-4 border-t border-gray-200">
           <Button variant="outline" onClick={handleClose} disabled={saving}>
