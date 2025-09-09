@@ -14,7 +14,7 @@ import StockManagement from '../stock/StockManagementPage';
 
 
 // Check if we're in testing mode
-const TESTING_MODE = true; // Should match the setting in AuthContext
+const TESTING_MODE = false; // Should match the setting in AuthContext
 
 const Dashboard = () => {
   const { user, logout } = useAuth();

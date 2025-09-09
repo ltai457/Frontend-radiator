@@ -14,7 +14,7 @@ const api = axios.create({
   }
 });
 
-// Add response interceptor for debugging
+// Add response interceptor for debugging and error handling
 api.interceptors.response.use(
   (response) => {
     if (import.meta.env.VITE_DEBUG === 'true') {
@@ -24,6 +24,13 @@ api.interceptors.response.use(
   },
   (error) => {
     console.error('❌ Auth API Error:', error.config?.method?.toUpperCase(), error.config?.url, error.response?.status, error.response?.data);
+    
+    // Handle 401 errors by clearing the session
+    if (error.response?.status === 401) {
+      console.log('🔓 Received 401, clearing session');
+      authService.logout();
+    }
+    
     return Promise.reject(error);
   }
 );
@@ -32,9 +39,19 @@ const authService = {
   // Login function
   async login(username, password) {
     try {
-      console.log('🔐 Attempting login to:', API_BASE_URL);
-      const response = await api.post('/auth/login', { username, password });
-      const { accessToken, refreshToken, user } = response.data;
+      console.log('🔐 Attempting login to:', `${API_BASE_URL}/auth/login`);
+      
+      const response = await api.post('/auth/login', { 
+        username: username.trim(), 
+        password 
+      });
+      
+      const { accessToken, refreshToken, user, expiresAt } = response.data;
+      
+      // Validate response structure
+      if (!accessToken || !refreshToken || !user) {
+        throw new Error('Invalid response structure from server');
+      }
       
       // Store tokens and login timestamp
       sessionStorage.setItem('accessToken', accessToken);
@@ -42,27 +59,66 @@ const authService = {
       sessionStorage.setItem('user', JSON.stringify(user));
       sessionStorage.setItem('loginTime', Date.now().toString());
       
+      if (expiresAt) {
+        sessionStorage.setItem('tokenExpiresAt', new Date(expiresAt).getTime().toString());
+      }
+      
       console.log('✅ Login successful for user:', user.username);
+      console.log('🔐 Token expires at:', new Date(expiresAt));
+      
       return { success: true, user };
     } catch (error) {
       console.error('❌ Login failed:', error.response?.data || error.message);
+      
+      // Clean up any partial session data
+      this.logout();
+      
+      let errorMessage = 'Login failed - please check your credentials';
+      
+      if (error.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      } else if (error.code === 'NETWORK_ERROR' || error.message.includes('Network Error')) {
+        errorMessage = 'Unable to connect to server. Please check if the API server is running.';
+      } else if (error.response?.status === 401) {
+        errorMessage = 'Invalid username or password';
+      }
+      
       return { 
         success: false, 
-        error: error.response?.data?.message || 'Login failed - please check if the API server is running' 
+        error: errorMessage 
       };
     }
   },
 
-  // Logout function
-  logout() {
+  // Enhanced logout function with server-side token revocation
+  async logout(refreshToken = null) {
+    try {
+      // Attempt server-side logout if we have a refresh token
+      const token = refreshToken || sessionStorage.getItem('refreshToken');
+      if (token) {
+        console.log('🔓 Attempting server-side logout');
+        await api.post('/auth/logout', { refreshToken: token });
+        console.log('✅ Server-side logout successful');
+      }
+    } catch (error) {
+      console.warn('⚠️ Server-side logout failed:', error.response?.data || error.message);
+      // Continue with client-side cleanup even if server logout fails
+    }
+
+    // Always clear client-side session
     sessionStorage.removeItem('accessToken');
     sessionStorage.removeItem('refreshToken');
     sessionStorage.removeItem('user');
     sessionStorage.removeItem('loginTime');
-    localStorage.removeItem('accessToken'); // Clean old localStorage tokens
+    sessionStorage.removeItem('tokenExpiresAt');
+    
+    // Clean up any legacy localStorage tokens
+    localStorage.removeItem('accessToken');
     localStorage.removeItem('refreshToken');
     localStorage.removeItem('user');
-    console.log('🔓 User logged out');
+    localStorage.removeItem('loginTime');
+    
+    console.log('🔓 Client-side logout completed');
   },
 
   // Get current user from storage (only if session is valid)
@@ -73,7 +129,15 @@ const authService = {
     }
     
     const userStr = sessionStorage.getItem('user');
-    return userStr ? JSON.parse(userStr) : null;
+    if (!userStr) return null;
+    
+    try {
+      return JSON.parse(userStr);
+    } catch (error) {
+      console.error('❌ Error parsing user data:', error);
+      this.logout(); // Clear corrupted session
+      return null;
+    }
   },
 
   // Get valid token (only if session hasn't expired)
@@ -88,83 +152,95 @@ const authService = {
 
   // Check if user is authenticated and session is valid
   isAuthenticated() {
-    return !!this.getValidToken() && !!this.getCurrentUser();
+    const token = this.getValidToken();
+    const user = sessionStorage.getItem('user');
+    return !!(token && user);
   },
 
-  // Check if session is still valid (within timeout period)
+  // Check if session is still valid
   isSessionValid() {
     const loginTime = sessionStorage.getItem('loginTime');
+    const tokenExpiresAt = sessionStorage.getItem('tokenExpiresAt');
+    
     if (!loginTime) return false;
     
     const now = Date.now();
-    const sessionAge = now - parseInt(loginTime);
+    const loginTimestamp = parseInt(loginTime);
     
+    // Check against token expiration if available
+    if (tokenExpiresAt) {
+      const expirationTime = parseInt(tokenExpiresAt);
+      return now < expirationTime;
+    }
+    
+    // Fallback to session timeout
+    const sessionAge = now - loginTimestamp;
     return sessionAge < SESSION_TIMEOUT;
   },
 
-  // Get session remaining time in minutes
-  getSessionRemainingTime() {
+  // Get remaining session time in minutes
+  getRemainingSessionTime() {
+    const tokenExpiresAt = sessionStorage.getItem('tokenExpiresAt');
     const loginTime = sessionStorage.getItem('loginTime');
+    
     if (!loginTime) return 0;
     
     const now = Date.now();
-    const sessionAge = now - parseInt(loginTime);
-    const remaining = SESSION_TIMEOUT - sessionAge;
+    let expirationTime;
     
-    return Math.max(0, Math.floor(remaining / (60 * 1000)));
+    if (tokenExpiresAt) {
+      expirationTime = parseInt(tokenExpiresAt);
+    } else {
+      expirationTime = parseInt(loginTime) + SESSION_TIMEOUT;
+    }
+    
+    const remainingTime = expirationTime - now;
+    return Math.max(0, Math.floor(remainingTime / (1000 * 60)));
   },
 
-  // Alias for compatibility with AuthContext (same as above)
-  getRemainingSessionTime() {
-    return this.getSessionRemainingTime();
-  },
-
-  // Refresh session timestamp (extend session)
-  refreshSession() {
+  // Extend session by updating login time
+  extendSession() {
     if (this.isAuthenticated()) {
       sessionStorage.setItem('loginTime', Date.now().toString());
-      console.log('🔄 Session refreshed');
-      return true;
+      console.log('🕐 Session extended');
     }
-    return false;
   },
 
-  // MISSING FUNCTION: Extend session (alias for refreshSession)
-  extendSession() {
-    return this.refreshSession();
-  },
-
-  // Check session status with detailed info
+  // Get session information
   getSessionInfo() {
     const loginTime = sessionStorage.getItem('loginTime');
-    const user = this.getCurrentUser();
-    const token = this.getValidToken();
+    const tokenExpiresAt = sessionStorage.getItem('tokenExpiresAt');
+    const token = sessionStorage.getItem('accessToken');
     
     return {
-      isAuthenticated: this.isAuthenticated(),
       isValid: this.isSessionValid(),
-      user: user,
       hasToken: !!token,
       loginTime: loginTime ? new Date(parseInt(loginTime)) : null,
-      remainingMinutes: this.getSessionRemainingTime(),
-      expiresAt: loginTime ? new Date(parseInt(loginTime) + SESSION_TIMEOUT) : null
+      expiresAt: tokenExpiresAt ? new Date(parseInt(tokenExpiresAt)) : null,
+      remainingMinutes: this.getRemainingSessionTime()
     };
   },
 
   // Test API connection
   async testConnection() {
     try {
-      const response = await axios.get(`${API_BASE_URL.replace('/api/v1', '')}/health`);
+      console.log('🔌 Testing API connection...');
+      const healthUrl = API_BASE_URL.replace('/api/v1', '/health');
+      const response = await axios.get(healthUrl, { timeout: 5000 });
+      console.log('✅ API connection successful');
       return { success: true, data: response.data };
     } catch (error) {
+      console.error('❌ API connection failed:', error.message);
       return { 
         success: false, 
-        error: error.message || 'API server is not responding' 
+        error: error.code === 'NETWORK_ERROR' 
+          ? 'Unable to connect to API server' 
+          : error.message || 'API server is not responding' 
       };
     }
   },
 
-  // Refresh token (if your backend supports it)
+  // Refresh token
   async refreshToken() {
     try {
       const refreshToken = sessionStorage.getItem('refreshToken');
@@ -172,24 +248,83 @@ const authService = {
         throw new Error('No refresh token available');
       }
 
+      console.log('🔄 Refreshing authentication token...');
       const response = await api.post('/auth/refresh', { refreshToken });
-      const { accessToken, refreshToken: newRefreshToken } = response.data;
+      const { accessToken, refreshToken: newRefreshToken, expiresAt } = response.data;
       
-      // Update tokens
+      // Update tokens and session
       sessionStorage.setItem('accessToken', accessToken);
       if (newRefreshToken) {
         sessionStorage.setItem('refreshToken', newRefreshToken);
       }
       sessionStorage.setItem('loginTime', Date.now().toString());
       
-      console.log('🔄 Token refreshed successfully');
+      if (expiresAt) {
+        sessionStorage.setItem('tokenExpiresAt', new Date(expiresAt).getTime().toString());
+      }
+      
+      console.log('✅ Token refreshed successfully');
       return { success: true };
     } catch (error) {
       console.error('❌ Token refresh failed:', error.response?.data || error.message);
-      this.logout(); // Clear invalid session
+      
+      // Clear invalid session
+      this.logout();
+      
       return { 
         success: false, 
-        error: error.response?.data?.message || 'Token refresh failed' 
+        error: error.response?.data?.message || 'Session refresh failed. Please login again.' 
+      };
+    }
+  },
+
+  // Register new user
+  async register(userData) {
+    try {
+      console.log('👤 Attempting user registration...');
+      const response = await api.post('/auth/register', userData);
+      console.log('✅ Registration successful');
+      return { success: true, data: response.data };
+    } catch (error) {
+      console.error('❌ Registration failed:', error.response?.data || error.message);
+      
+      let errorMessage = 'Registration failed';
+      if (error.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      } else if (error.response?.status === 409) {
+        errorMessage = 'Username or email already exists';
+      }
+      
+      return { 
+        success: false, 
+        error: errorMessage 
+      };
+    }
+  },
+
+  // Change password
+  async changePassword(currentPassword, newPassword) {
+    try {
+      console.log('🔐 Attempting password change...');
+      await api.post('/auth/change-password', {
+        currentPassword,
+        newPassword
+      });
+      console.log('✅ Password changed successfully');
+      return { success: true };
+    } catch (error) {
+      console.error('❌ Password change failed:', error.response?.data || error.message);
+      
+      let errorMessage = 'Password change failed';
+      if (error.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      } else if (error.response?.status === 400) {
+        errorMessage = 'Current password is incorrect';
+      }
+      
+      return { 
+        success: false, 
+        error: errorMessage 
       };
     }
   }
