@@ -1,0 +1,87 @@
+import React from "react";
+import { Package } from "lucide-react";
+import { useStockManagement } from "../../hooks/useStockManagement";
+import StockHeader from "./sections/StockHeader";
+import StockToolbar from "./sections/StockToolbar";
+import StockOverviewGrid from "./sections/StockOverviewGrid";
+import StockTable from "./views/StockTable";
+
+export default function StockManagement() {
+  const sm = useStockManagement();
+
+  if (sm.loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <Package className="w-12 h-12 text-blue-500 animate-spin mx-auto mb-4" />
+          <p className="text-gray-600">Loading stock data...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (sm.error) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
+          {sm.error}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6 p-6 bg-gray-50 min-h-screen">
+      <div className="max-w-7xl mx-auto space-y-6">
+        <StockHeader />
+
+        <StockOverviewGrid
+          warehouses={sm.warehouses}
+          radiators={sm.radiators}
+          selectedWarehouse={sm.selectedWarehouse}
+          setSelectedWarehouse={sm.setSelectedWarehouse}
+          getTotalStock={sm.getTotalStock}
+        />
+
+        <StockToolbar
+          searchTerm={sm.searchTerm}
+          setSearchTerm={sm.setSearchTerm}
+          filterLowStock={sm.filterLowStock}
+          setFilterLowStock={sm.setFilterLowStock}
+          editMode={sm.editMode}
+          updating={sm.updating}
+          editingCount={Object.keys(sm.editingStocks || {}).length}
+          onEdit={sm.handleEditMode}
+          onCancel={sm.handleCancelEdit}
+          onSave={sm.handleSaveChanges}
+          selectedWarehouse={sm.selectedWarehouse}   // hide Edit Stock in "all"
+        />
+
+        <div className="mb-1">
+          <p className="text-sm text-gray-600">
+            {sm.selectedWarehouse === "all"
+              ? "Viewing stock across all warehouses"
+              : `Viewing stock for ${
+                  sm.warehouses.find((w) => w.code === sm.selectedWarehouse)?.name ||
+                  sm.selectedWarehouse
+                }`}
+            {sm.editMode && sm.selectedWarehouse !== "all" && (
+              <span className="ml-2 text-blue-600 font-medium">• Edit Mode Active</span>
+            )}
+          </p>
+        </div>
+
+        <StockTable
+          warehouses={sm.warehouses}
+          items={sm.filteredRadiators}
+          selectedWarehouse={sm.selectedWarehouse}
+          editMode={sm.editMode}
+          getTotalStock={sm.getTotalStock}
+          getStockStatus={sm.getStockStatus}
+          getDisplayStock={sm.getDisplayStock}
+          onChangeStock={sm.handleStockChange}
+        />
+      </div>
+    </div>
+  );
+}

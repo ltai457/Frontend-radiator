@@ -8,8 +8,10 @@ import DashboardOverview from './DashboardOverview';
 import CustomerList from '../customers/CustomerList';
 import SalesManagement from '../sales/SalesManagement';
 import RadiatorList from '../inventory/RadiatorList';
-import WarehouseStock from '../stock/WarehouseStock';
+import WarehouseStock from '../stock/StockManagementPage';
 import WarehouseManagement from '../warehouse/WarehouseManagement'; 
+import StockManagement from '../stock/StockManagementPage';
+
 
 // Check if we're in testing mode
 const TESTING_MODE = true; // Should match the setting in AuthContext
@@ -46,7 +48,7 @@ const Dashboard = () => {
       case 'warehouses':
         return <WarehouseManagement />;
       case 'stock':
-        return <WarehouseStock />;
+        return <StockManagement />;
       default:
         return <DashboardOverview onNavigate={setActiveTab} />;
     }
