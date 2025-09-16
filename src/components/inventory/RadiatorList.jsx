@@ -1,3 +1,4 @@
+// src/components/radiators/RadiatorList.jsx
 import React, { useEffect, useState } from 'react';
 import { Package, Plus, List as ListIcon, Grid as GridIcon } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
@@ -10,10 +11,13 @@ import { Button } from '../common/ui/Button';
 import { EmptyState } from '../common/layout/EmptyState';
 import RadiatorFilters from './RadiatorFilters';
 import RadiatorTable from './RadiatorTable';
-import RadiatorCards from './RadiatorCards'; // ⬅️ NEW
+import RadiatorCards from './RadiatorCards';
 import RadiatorStats from './RadiatorStats';
 import AddRadiatorModal from './modals/AddRadiatorModal';
 import EditRadiatorModal from './modals/EditRadiatorModal';
+
+// ⬇️ Import the service so we can call createWithImage when needed
+import radiatorService from '../../api/radiatorService';
 
 const RadiatorList = () => {
   const { user } = useAuth();
@@ -59,19 +63,29 @@ const RadiatorList = () => {
     user?.role === 'admin' ||
     (Array.isArray(user?.role) && user.role.map(String).some(r => r.toLowerCase() === 'admin' || r === '1'));
 
-  const handleAddRadiator = async (radiatorData) => {
+  // 🔁 Add handler that supports optional image
+  const handleAddRadiator = async (radiatorData, selectedImage) => {
     try {
-      const result = await createRadiator(radiatorData);
-      if (result.success) {
+      let result;
+
+      if (selectedImage) {
+        // Use direct service call for multipart create-with-image
+        result = await radiatorService.createWithImage(radiatorData, selectedImage);
+      } else {
+        // Use existing hook JSON create
+        result = await createRadiator(radiatorData);
+      }
+
+      if (result?.success) {
         addModal.closeModal();
         if (refetch) await refetch();
         return true;
       } else {
-        throw new Error(result.error || 'Failed to create radiator');
+        throw new Error(result?.error || 'Failed to create radiator');
       }
-    } catch (error) {
-      console.error('Error adding radiator:', error);
-      alert('Failed to add radiator: ' + error.message);
+    } catch (e) {
+      console.error('Error adding radiator:', e);
+      alert('Failed to add radiator: ' + (e.message || 'Unknown error'));
       return false;
     }
   };
@@ -214,7 +228,7 @@ const RadiatorList = () => {
       <AddRadiatorModal
         isOpen={addModal.isOpen}
         onClose={addModal.closeModal}
-        onSuccess={handleAddRadiator}
+        onSuccess={handleAddRadiator}   
         warehouses={warehouses || []}
       />
       

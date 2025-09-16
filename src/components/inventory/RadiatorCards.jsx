@@ -1,6 +1,7 @@
 import React from "react";
 import { Edit, Trash2, Package } from "lucide-react";
 import { Button } from "../common/ui/Button";
+import RadiatorImage from "./RadiatorImage"; // Import our image component
 
 // Money formatter
 const fmtMoney = (n) =>
@@ -32,9 +33,39 @@ const RadiatorCards = ({ radiators, onEdit, onDelete, onEditStock, isAdmin }) =>
             key={r.id}
             className="rounded-2xl border border-gray-200 bg-white shadow-sm hover:shadow-md transition p-4 flex flex-col"
           >
-            {/* Placeholder for image */}
-            <div className="w-full h-40 bg-gray-100 rounded-lg flex items-center justify-center mb-4">
-              <span className="text-gray-400 text-sm">Image here</span>
+            {/* UPDATED: Real image instead of placeholder */}
+            <div className="w-full h-40 bg-gray-100 rounded-lg flex items-center justify-center mb-4 overflow-hidden">
+              {r.primaryImageUrl || r.imageUrl ? (
+                <div className="relative w-full h-full">
+                  <img
+                    src={r.primaryImageUrl || r.imageUrl}
+                    alt={r.name}
+                    className="w-full h-full object-cover rounded-lg"
+                    onError={(e) => {
+                      // If image fails to load, show placeholder
+                      e.target.style.display = 'none';
+                      e.target.nextSibling.style.display = 'flex';
+                    }}
+                  />
+                  {/* Fallback placeholder (hidden by default) */}
+                  <div className="absolute inset-0 bg-gray-100 rounded-lg flex items-center justify-center" style={{ display: 'none' }}>
+                    <Package className="w-8 h-8 text-gray-400" />
+                  </div>
+                  
+                  {/* Image count badge if multiple images */}
+                  {r.imageCount > 1 && (
+                    <div className="absolute top-2 right-2 bg-black bg-opacity-70 text-white text-xs px-2 py-1 rounded-full">
+                      +{r.imageCount - 1}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                // No image placeholder
+                <div className="w-full h-full flex flex-col items-center justify-center text-gray-400">
+                  <Package className="w-8 h-8 mb-2" />
+                  <span className="text-xs">No image</span>
+                </div>
+              )}
             </div>
 
             {/* Main Info */}
@@ -51,12 +82,10 @@ const RadiatorCards = ({ radiators, onEdit, onDelete, onEditStock, isAdmin }) =>
                   {fmtMoney(r.retailPrice)}
                 </p>
                 
-
                 <p className="text-sm text-gray-900">
                   <span className="font-medium">Trade: </span>
                   {fmtMoney(r.tradePrice)}
                 </p>
-                
               </div>
 
               {/* Stock */}

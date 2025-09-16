@@ -1,5 +1,6 @@
 // src/components/inventory/modals/AddRadiatorModal.jsx
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useState, useRef } from "react";
+import { Upload, X, Image as ImageIcon } from "lucide-react";
 import { Modal } from "../../common/ui/Modal";
 import { Button } from "../../common/ui/Button";
 
@@ -10,42 +11,65 @@ const emptyForm = {
   year: "",
   retailPrice: "",
   tradePrice: "",
+  costPrice: "",
   isPriceOverridable: false,
   maxDiscountPercent: "",
 };
 
 const AddRadiatorModal = ({ isOpen, onClose, onSuccess, warehouses = [] }) => {
   const [form, setForm] = useState(emptyForm);
-  const [initialStock, setInitialStock] = useState({});
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
-  // Initialize per-warehouse stock inputs to 0
-  const defaultStock = useMemo(() => {
-    const obj = {};
-    warehouses.forEach((w) => (obj[w.code] = 0));
-    return obj;
-  }, [warehouses]);
+  // Image state
+  const [selectedImage, setSelectedImage] = useState(null);
+  const [imagePreview, setImagePreview] = useState(null);
+  const fileInputRef = useRef(null);
 
-  useEffect(() => {
-    if (isOpen) {
-      setForm(emptyForm);
-      setInitialStock(defaultStock);
-      setSaving(false);
-      setError("");
-    }
-  }, [isOpen, defaultStock]);
+  // Initial stock for warehouses
+  const [initialStock, setInitialStock] = useState({});
 
   const updateField = (key, value) => {
     setForm((prev) => ({ ...prev, [key]: value }));
   };
 
-  const updateWarehouseQty = (code, value) => {
-    const qty = Math.max(0, Number(value || 0));
-    setInitialStock((prev) => ({ ...prev, [code]: qty }));
+  const updateStock = (warehouseCode, quantity) => {
+    setInitialStock((prev) => ({
+      ...prev,
+      [warehouseCode]: Math.max(0, parseInt(quantity) || 0),
+    }));
   };
 
   const num = (v) => (v === "" || v === null || v === undefined ? null : Number(v));
+
+  // Image handling
+  const handleImageSelect = (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      setError("Please select a valid image file");
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setError("Image file size must be less than 5MB");
+      return;
+    }
+
+    setSelectedImage(file);
+
+    const reader = new FileReader();
+    reader.onload = (e) => setImagePreview(e.target.result);
+    reader.readAsDataURL(file);
+
+    setError("");
+  };
+
+  const handleRemoveImage = () => {
+    setSelectedImage(null);
+    setImagePreview(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
 
   const validate = () => {
     if (!form.brand?.trim()) return "Brand is required.";
@@ -60,7 +84,7 @@ const AddRadiatorModal = ({ isOpen, onClose, onSuccess, warehouses = [] }) => {
     const tp = num(form.tradePrice);
     const md = num(form.maxDiscountPercent);
 
-    if (rp !== null && (isNaN(rp) || rp < 0)) return "Retail price must be ≥ 0.";
+    if (rp === null || isNaN(rp) || rp < 0) return "Retail price is required and must be ≥ 0.";
     if (tp !== null && (isNaN(tp) || tp < 0)) return "Trade price must be ≥ 0.";
     if (md !== null && (isNaN(md) || md < 0 || md > 100)) return "Max discount must be between 0 and 100.";
 
@@ -76,28 +100,32 @@ const AddRadiatorModal = ({ isOpen, onClose, onSuccess, warehouses = [] }) => {
 
     setSaving(true);
     setError("");
-    
+
     try {
       const payload = {
         brand: form.brand.trim(),
         code: form.code.trim(),
         name: form.name.trim(),
         year: Number(form.year),
-
-        // New: pricing fields
         retailPrice: num(form.retailPrice),
         tradePrice: num(form.tradePrice),
+        costPrice: num(form.costPrice),
         isPriceOverridable: !!form.isPriceOverridable,
         maxDiscountPercent: num(form.maxDiscountPercent),
-
-        // Include initial stock if warehouses are provided
-        ...(warehouses.length > 0 && { stock: initialStock }),
+        stock: initialStock, // key used by service to map to InitialStock[…]
       };
 
-      const success = await onSuccess(payload);
+      // onSuccess is provided by parent and must return true/false
+      const success = await onSuccess(payload, selectedImage);
       if (!success) throw new Error("Failed to create radiator");
+
+      // Reset form
+      setForm(emptyForm);
+      setSelectedImage(null);
+      setImagePreview(null);
+      setInitialStock({});
+      if (fileInputRef.current) fileInputRef.current.value = "";
     } catch (e) {
-      console.error("Error creating radiator:", e);
       setError(e.message || "Failed to create radiator");
     } finally {
       setSaving(false);
@@ -107,6 +135,11 @@ const AddRadiatorModal = ({ isOpen, onClose, onSuccess, warehouses = [] }) => {
   const handleClose = () => {
     if (!saving) {
       setError("");
+      setForm(emptyForm);
+      setSelectedImage(null);
+      setImagePreview(null);
+      setInitialStock({});
+      if (fileInputRef.current) fileInputRef.current.value = "";
       onClose();
     }
   };
@@ -181,61 +214,166 @@ const AddRadiatorModal = ({ isOpen, onClose, onSuccess, warehouses = [] }) => {
           </div>
         </div>
 
+        {/* Image Upload */}
+        <div className="space-y-3">
+          <div className="text-sm font-medium text-gray-900">Product Image</div>
+
+          {!imagePreview ? (
+            <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
+              <input
+                type="file"
+                ref={fileInputRef}
+                onChange={handleImageSelect}
+                accept="image/*"
+                className="hidden"
+                disabled={saving}
+              />
+              <ImageIcon className="mx-auto h-12 w-12 text-gray-400 mb-2" />
+              <p className="text-sm text-gray-600 mb-2">Click to upload a product image</p>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={saving}
+                className="inline-flex items-center"
+              >
+                <Upload className="w-4 h-4 mr-2" />
+                Choose Image
+              </Button>
+              <p className="text-xs text-gray-500 mt-2">PNG, JPG, GIF up to 5MB</p>
+            </div>
+          ) : (
+            <div className="relative border border-gray-300 rounded-lg p-4">
+              <div className="flex items-start space-x-4">
+                <img
+                  src={imagePreview}
+                  alt="Preview"
+                  className="w-20 h-20 object-cover rounded-lg border border-gray-200"
+                />
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-gray-900">{selectedImage?.name}</p>
+                  <p className="text-xs text-gray-500">
+                    {selectedImage && (selectedImage.size / 1024 / 1024).toFixed(2)} MB
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleRemoveImage}
+                  disabled={saving}
+                  className="text-gray-400 hover:text-red-500 transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+
         {/* Pricing */}
         <div className="space-y-3">
           <div className="text-sm font-medium text-gray-900">Pricing</div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Retail Price ($)</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Retail Price ($) <span className="text-red-500">*</span>
+              </label>
               <input
                 type="number"
-                min={0}
                 step="0.01"
+                min="0"
                 value={form.retailPrice}
                 onChange={(e) => updateField("retailPrice", e.target.value)}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                placeholder="e.g., 149.99"
+                placeholder="0.00"
                 disabled={saving}
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Trade Price ($)</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Trade Price ($)
+              </label>
               <input
                 type="number"
-                min={0}
                 step="0.01"
+                min="0"
                 value={form.tradePrice}
                 onChange={(e) => updateField("tradePrice", e.target.value)}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                placeholder="e.g., 129.99"
+                placeholder="0.00"
+                disabled={saving}
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Cost Price ($)
+              </label>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                value={form.costPrice}
+                onChange={(e) => updateField("costPrice", e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                placeholder="0.00"
                 disabled={saving}
               />
             </div>
 
-            
-
-            
+            <div className="flex items-center space-x-2">
+              <input
+                type="checkbox"
+                id="isPriceOverridable"
+                checked={form.isPriceOverridable}
+                onChange={(e) => updateField("isPriceOverridable", e.target.checked)}
+                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                disabled={saving}
+              />
+              <label htmlFor="isPriceOverridable" className="text-sm text-gray-700">
+                Allow price override during sales
+              </label>
+            </div>
           </div>
+
+          {form.isPriceOverridable && (
+            <div className="sm:w-1/2">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Max Discount (%)
+              </label>
+              <input
+                type="number"
+                step="0.1"
+                min="0"
+                max="100"
+                value={form.maxDiscountPercent}
+                onChange={(e) => updateField("maxDiscountPercent", e.target.value)}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                placeholder="0"
+                disabled={saving}
+              />
+            </div>
+          )}
         </div>
 
-        {/* Initial stock per warehouse */}
+        {/* Initial Stock */}
         {warehouses.length > 0 && (
           <div className="space-y-3">
-            <div className="text-sm font-medium text-gray-900">Initial Stock by Warehouse</div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {warehouses.map((w) => (
-                <div key={w.id} className="flex items-center gap-3">
-                  <div className="min-w-0 flex-1">
-                    <div className="text-sm font-medium text-gray-800">{w.name}</div>
-                    <div className="text-xs text-gray-500">Code: {w.code}</div>
-                  </div>
+            <div className="text-sm font-medium text-gray-900">Initial Stock</div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {warehouses.map((warehouse) => (
+                <div key={warehouse.id}>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    {warehouse.name} ({warehouse.code})
+                  </label>
                   <input
                     type="number"
-                    min={0}
-                    value={initialStock[w.code] ?? 0}
-                    onChange={(e) => updateWarehouseQty(w.code, e.target.value)}
-                    className="w-20 border border-gray-300 rounded-lg px-2 py-1 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    min="0"
+                    value={initialStock[warehouse.code] || ""}
+                    onChange={(e) => updateStock(warehouse.code, e.target.value)}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     placeholder="0"
                     disabled={saving}
                   />
@@ -246,11 +384,11 @@ const AddRadiatorModal = ({ isOpen, onClose, onSuccess, warehouses = [] }) => {
         )}
 
         {/* Actions */}
-        <div className="flex justify-end gap-2 pt-4 border-t border-gray-200">
+        <div className="flex justify-end space-x-3 pt-4 border-t border-gray-200">
           <Button variant="outline" onClick={handleClose} disabled={saving}>
             Cancel
           </Button>
-          <Button onClick={handleSave} disabled={saving}>
+          <Button onClick={handleSave} loading={saving}>
             {saving ? "Creating..." : "Create Radiator"}
           </Button>
         </div>

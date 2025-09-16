@@ -1,3 +1,4 @@
+// src/hooks/useRadiators.js
 import { useState, useEffect, useCallback } from 'react';
 import radiatorService from '../api/radiatorService';
 import { getErrorMessage } from '../utils/helpers';
@@ -25,9 +26,20 @@ export const useRadiators = () => {
     }
   }, []);
 
-  const createRadiator = async (radiatorData) => {
+  // UPDATED: Create radiator (with optional image support)
+  const createRadiator = async (radiatorData, imageFile = null) => {
     try {
-      const result = await radiatorService.create(radiatorData);
+      let result;
+      
+      // Use createWithImage if image is provided, otherwise use regular create
+      if (imageFile) {
+        console.log('🖼️ Creating radiator with image...');
+        result = await radiatorService.createWithImage(radiatorData, imageFile);
+      } else {
+        console.log('📝 Creating radiator without image...');
+        result = await radiatorService.create(radiatorData);
+      }
+      
       if (result.success) {
         setRadiators(prev => [result.data, ...prev]);
         return { success: true, data: result.data };
@@ -86,6 +98,29 @@ export const useRadiators = () => {
     }
   };
 
+  // NEW: Image-related functions
+  const getRadiatorImages = async (radiatorId) => {
+    try {
+      const result = await radiatorService.getRadiatorImages(radiatorId);
+      return result;
+    } catch (err) {
+      return { success: false, error: getErrorMessage(err) };
+    }
+  };
+
+  const uploadRadiatorImage = async (radiatorId, imageFile, isPrimary = false) => {
+    try {
+      const result = await radiatorService.uploadImage(radiatorId, imageFile, isPrimary);
+      if (result.success) {
+        // Refresh the radiators to get updated image info
+        await fetchRadiators();
+      }
+      return result;
+    } catch (err) {
+      return { success: false, error: getErrorMessage(err) };
+    }
+  };
+
   useEffect(() => {
     fetchRadiators();
   }, [fetchRadiators]);
@@ -95,9 +130,13 @@ export const useRadiators = () => {
     loading,
     error,
     fetchRadiators,
+    refetch: fetchRadiators, // alias for consistency
     createRadiator,
     updateRadiator,
     deleteRadiator,
-    updateStock
+    updateStock,
+    // NEW: Image functions
+    getRadiatorImages,
+    uploadRadiatorImage
   };
-};
+}
