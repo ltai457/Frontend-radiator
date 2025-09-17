@@ -13,7 +13,6 @@ import WarehouseToolbar from "./sections/WarehouseToolbar";
 import WarehouseTable from "./views/WarehouseTable";
 import WarehouseCards from "./views/WarehouseCards";
 
-
 import CreateWarehouseModal from "./modals/CreateWarehouseModal";
 import EditWarehouseModal from "./modals/EditWarehouseModal";
 import ConfirmDeleteModal from "../common/modals/ConfirmDeleteModal";
@@ -42,7 +41,21 @@ const WarehouseManagement = () => {
   const deleteModal = useModal();
   const viewModal = useModal();
 
-  const isAdmin = user?.role === "Admin" || user?.role?.includes?.("Admin");
+  // ✅ FIXED: Use the same comprehensive admin role check as RadiatorList.jsx
+  const isAdmin =
+    user?.role === 1 ||
+    user?.role === '1' ||
+    user?.role === 'Admin' ||
+    user?.role === 'admin' ||
+    (Array.isArray(user?.role) && user.role.map(String).some(r => r.toLowerCase() === 'admin' || r === '1'));
+
+  // 🔍 DEBUG: Add logging to help diagnose role issues
+  console.log('=== WAREHOUSE MANAGEMENT DEBUG ===');
+  console.log('User object:', user);
+  console.log('User role:', user?.role);
+  console.log('Role type:', typeof user?.role);
+  console.log('isAdmin result:', isAdmin);
+  console.log('================================');
 
   // ---- defensive base list
   const list = Array.isArray(warehouses) ? warehouses : [];
@@ -88,53 +101,36 @@ const WarehouseManagement = () => {
     return sorted;
   }, [list, searchTerm, sortBy, sortOrder]);
 
-  // one-safe alias used everywhere in JSX
-  const items = Array.isArray(processedWarehouses) ? processedWarehouses : [];
-
-  // ---- derived: stats (defensive)
+  // ---- computed values for components
+  const items = processedWarehouses;
   const stats = useMemo(() => {
-    const activeWarehouses = list.filter((w) => w?.status !== "inactive").length;
-    const uniqueLocations = new Set(
-      list.map((w) => w?.location?.split(",")[0]?.trim()).filter(Boolean)
-    ).size;
-    const lastUpdate =
-      list.length > 0
-        ? new Date(
-            Math.max(
-              ...list.map((w) => new Date(w?.updatedAt || w?.createdAt || 0))
-            )
-          )
-        : null;
-
-    return { total: list.length, activeWarehouses, uniqueLocations, lastUpdate };
+    return {
+      total: list.length,
+      active: list.filter(w => w?.status !== 'inactive').length, 
+      locations: new Set(list.map(w => w?.location).filter(Boolean)).size,
+    };
   }, [list]);
 
   // ---- handlers
   const handleSort = (column) => {
-    if (sortBy === column) setSortOrder((o) => (o === "asc" ? "desc" : "asc"));
-    else {
+    if (sortBy === column) {
+      setSortOrder(prev => prev === "asc" ? "desc" : "asc");
+    } else {
       setSortBy(column);
       setSortOrder("asc");
     }
   };
 
   const handleExport = () => {
-    const dataStr = JSON.stringify(items, null, 2);
-    const dataUri =
-      "data:application/json;charset=utf-8," + encodeURIComponent(dataStr);
-    const exportFileDefaultName = `warehouses_${
-      new Date().toISOString().split("T")[0]
-    }.json`;
-    const a = document.createElement("a");
-    a.href = dataUri;
-    a.download = exportFileDefaultName;
-    a.click();
+    // TODO: Implement export functionality
+    console.log("Export warehouses:", items);
+    alert("Export functionality not yet implemented");
   };
 
-  const handleCreateWarehouse = async (payload) => {
+  const handleCreateWarehouse = async (warehouseData) => {
     try {
       setActionLoading(true);
-      const result = await createWarehouse(payload);
+      const result = await createWarehouse(warehouseData);
       if (result?.success) {
         createModal.closeModal();
         await refetch();
@@ -150,9 +146,18 @@ const WarehouseManagement = () => {
     }
   };
 
-  const handleUpdateWarehouse = async (payload) => {
+  const handleUpdateWarehouse = async (warehouseData) => {
     try {
       setActionLoading(true);
+      const payload = {
+        name: warehouseData.name?.trim(),
+        code: warehouseData.code?.trim(),
+        location: warehouseData.location?.trim() || null,
+        address: warehouseData.address?.trim() || null,
+        phone: warehouseData.phone?.trim() || null,
+        email: warehouseData.email?.trim() || null,
+      };
+      
       const id = editModal?.data?.id;
       const result = await updateWarehouse(id, payload);
       if (result?.success) {
@@ -270,8 +275,6 @@ const WarehouseManagement = () => {
           onDelete={deleteModal.openModal}
         />
       )}
-
-    
 
       <CreateWarehouseModal
         isOpen={createModal.isOpen}

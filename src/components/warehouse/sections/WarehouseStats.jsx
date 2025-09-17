@@ -10,27 +10,8 @@ export default function WarehouseStats({ stats }) {
       color: "bg-blue-100 text-blue-600",
       bgColor: "bg-blue-50",
     },
-    {
-      label: "Active Locations",
-      value: stats.uniqueLocations,
-      Icon: MapPin,
-      color: "bg-green-100 text-green-600",
-      bgColor: "bg-green-50",
-    },
-    {
-      label: "Active Warehouses",
-      value: stats.activeWarehouses,
-      Icon: Package,
-      color: "bg-purple-100 text-purple-600",
-      bgColor: "bg-purple-50",
-    },
-    {
-      label: "Last Updated",
-      value: stats.lastUpdate ? stats.lastUpdate.toLocaleDateString() : "N/A",
-      Icon: Clock,
-      color: "bg-yellow-100 text-yellow-600",
-      bgColor: "bg-yellow-50",
-    },
+    
+   
   ];
 
   return (

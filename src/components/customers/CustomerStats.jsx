@@ -17,21 +17,10 @@ const CustomerStats = ({ customers }) => {
       color: 'green',
       icon: UserCheck
     },
-    {
-      title: 'Total Orders',
-      value: customers.reduce((sum, c) => sum + (c.totalPurchases || 0), 0).toString(),
-      color: 'yellow',
-      icon: ShoppingCart
-    },
-    {
-      title: 'Total Revenue',
-      value: formatCurrency(customers.reduce((sum, c) => sum + (c.totalSpent || 0), 0)),
-      color: 'purple',
-      icon: DollarSign
-    }
+    
   ];
 
-  return <StatsGrid stats={stats} columns={4} />;
+  return <StatsGrid stats={stats} columns={2} />;
 };
 
 export default CustomerStats;

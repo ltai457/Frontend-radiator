@@ -1,5 +1,5 @@
 // src/contexts/AuthContext.jsx
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import authService from '../api/authService';
 
 const AuthContext = createContext();
@@ -25,6 +25,7 @@ export const AuthProvider = ({ children }) => {
       const currentUser = authService.getCurrentUser();
       if (currentUser && authService.isAuthenticated()) {
         console.log('✅ Found valid session for user:', currentUser.username);
+        console.log('📊 Session info:', authService.getSessionInfo());
         setUser(currentUser);
       } else {
         console.log('❌ No valid session found');
@@ -38,7 +39,7 @@ export const AuthProvider = ({ children }) => {
     initializeAuth();
   }, []);
 
-  // Session timeout checking
+  // Session timeout checking with better intervals
   useEffect(() => {
     if (!user) return;
 
@@ -60,8 +61,8 @@ export const AuthProvider = ({ children }) => {
       }
     };
 
-    // Check session every minute
-    const sessionInterval = setInterval(checkSession, 60000);
+    // Check session every 30 seconds instead of every minute for better responsiveness
+    const sessionInterval = setInterval(checkSession, 30000);
     
     // Check immediately
     checkSession();
@@ -70,28 +71,46 @@ export const AuthProvider = ({ children }) => {
   }, [user]);
 
   // Auto-logout on session expiry
-  const handleSessionExpired = () => {
+  const handleSessionExpired = useCallback(() => {
+    console.log('🚨 Session expired, logging out...');
     authService.logout();
     setUser(null);
     setSessionWarning(false);
     
-    // Show notification
-    if (window.confirm('Your session has expired for security reasons. Please login again.')) {
-      window.location.reload();
-    }
-  };
+    // Show notification and redirect
+    setTimeout(() => {
+      if (window.confirm('Your session has expired for security reasons. Please login again.')) {
+        window.location.href = '/login';
+      } else {
+        window.location.href = '/login';
+      }
+    }, 100);
+  }, []);
 
-  // Activity tracking to extend session
+  // Activity tracking to extend session - IMPROVED VERSION
   useEffect(() => {
     if (!user) return;
 
-    const activities = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click'];
+    // More comprehensive activity tracking
+    const activities = [
+      'mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 
+      'click', 'focus', 'blur', 'resize', 'visibilitychange'
+    ];
+    
+    let activityTimeout;
     
     const extendSessionOnActivity = () => {
-      if (authService.isAuthenticated()) {
-        authService.extendSession();
-        setSessionWarning(false); // Hide warning on activity
-      }
+      // Debounce activity tracking to prevent excessive calls
+      clearTimeout(activityTimeout);
+      activityTimeout = setTimeout(() => {
+        if (authService.isAuthenticated()) {
+          const extended = authService.extendSession();
+          if (extended) {
+            console.log('🔄 Session extended due to user activity');
+            setSessionWarning(false); // Hide warning on activity
+          }
+        }
+      }, 1000); // Wait 1 second after activity stops
     };
 
     // Add event listeners
@@ -100,12 +119,39 @@ export const AuthProvider = ({ children }) => {
     });
 
     return () => {
+      clearTimeout(activityTimeout);
       // Clean up event listeners
       activities.forEach(activity => {
         document.removeEventListener(activity, extendSessionOnActivity);
       });
     };
   }, [user]);
+
+  // Page visibility change handler - extend session when page becomes visible
+  useEffect(() => {
+    if (!user) return;
+
+    const handleVisibilityChange = () => {
+      if (!document.hidden && authService.isAuthenticated()) {
+        console.log('👁️ Page became visible, checking session...');
+        const sessionInfo = authService.getSessionInfo();
+        console.log('📊 Current session info:', sessionInfo);
+        
+        if (!sessionInfo.isValid) {
+          handleSessionExpired();
+        } else {
+          // Extend session when returning to the page
+          authService.extendSession();
+        }
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [user, handleSessionExpired]);
 
   const login = async (username, password) => {
     console.log('🚀 Attempting login for user:', username);
@@ -149,14 +195,19 @@ export const AuthProvider = ({ children }) => {
   };
 
   const isAuthenticated = () => {
-    return !!user && authService.isAuthenticated();
+    return !!(user && authService.isAuthenticated());
   };
 
   const extendSession = () => {
     if (user && authService.isAuthenticated()) {
-      authService.extendSession();
-      setSessionWarning(false);
+      const extended = authService.extendSession();
+      if (extended) {
+        setSessionWarning(false);
+        console.log('✅ Session manually extended');
+      }
+      return extended;
     }
+    return false;
   };
 
   const refreshUserSession = async () => {
@@ -166,7 +217,6 @@ export const AuthProvider = ({ children }) => {
       const result = await authService.refreshToken();
       if (result.success) {
         console.log('✅ Session refreshed successfully');
-        // Update session warning state
         setSessionWarning(false);
         return true;
       } else {

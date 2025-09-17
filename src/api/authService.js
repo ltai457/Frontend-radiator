@@ -6,6 +6,9 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE || 'http://localhost:5128/api
 // Session timeout in milliseconds (30 minutes)
 const SESSION_TIMEOUT = 30 * 60 * 1000;
 
+// Activity tracking timeout (extend session on activity)
+const ACTIVITY_EXTEND_INTERVAL = 5 * 60 * 1000; // 5 minutes
+
 // Create axios instance
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -13,6 +16,9 @@ const api = axios.create({
     'Content-Type': 'application/json'
   }
 });
+
+// Track last activity time to prevent too frequent session extensions
+let lastActivityExtension = 0;
 
 // Add response interceptor for debugging and error handling
 api.interceptors.response.use(
@@ -53,18 +59,29 @@ const authService = {
         throw new Error('Invalid response structure from server');
       }
       
+      const now = Date.now();
+      
       // Store tokens and login timestamp
       sessionStorage.setItem('accessToken', accessToken);
       sessionStorage.setItem('refreshToken', refreshToken);
       sessionStorage.setItem('user', JSON.stringify(user));
-      sessionStorage.setItem('loginTime', Date.now().toString());
+      sessionStorage.setItem('loginTime', now.toString());
+      sessionStorage.setItem('lastActivity', now.toString());
       
+      // Set expiration time
+      let expirationTime;
       if (expiresAt) {
-        sessionStorage.setItem('tokenExpiresAt', new Date(expiresAt).getTime().toString());
+        expirationTime = new Date(expiresAt).getTime();
+      } else {
+        // Default to 30 minutes from now if no expiresAt provided
+        expirationTime = now + SESSION_TIMEOUT;
       }
       
+      sessionStorage.setItem('tokenExpiresAt', expirationTime.toString());
+      
       console.log('✅ Login successful for user:', user.username);
-      console.log('🔐 Token expires at:', new Date(expiresAt));
+      console.log('🔐 Token expires at:', new Date(expirationTime));
+      console.log('⏰ Session timeout:', SESSION_TIMEOUT / (1000 * 60), 'minutes');
       
       return { success: true, user };
     } catch (error) {
@@ -79,137 +96,141 @@ const authService = {
         errorMessage = error.response.data.message;
       } else if (error.code === 'NETWORK_ERROR' || error.message.includes('Network Error')) {
         errorMessage = 'Unable to connect to server. Please check if the API server is running.';
-      } else if (error.response?.status === 401) {
-        errorMessage = 'Invalid username or password';
       }
       
-      return { 
-        success: false, 
-        error: errorMessage 
-      };
+      return { success: false, error: errorMessage };
     }
   },
 
-  // Enhanced logout function with server-side token revocation
-  async logout(refreshToken = null) {
+  // Logout function
+  async logout(refreshToken) {
     try {
-      // Attempt server-side logout if we have a refresh token
-      const token = refreshToken || sessionStorage.getItem('refreshToken');
-      if (token) {
-        console.log('🔓 Attempting server-side logout');
-        await api.post('/auth/logout', { refreshToken: token });
-        console.log('✅ Server-side logout successful');
+      if (refreshToken) {
+        await api.post('/auth/logout', { refreshToken });
       }
     } catch (error) {
-      console.warn('⚠️ Server-side logout failed:', error.response?.data || error.message);
-      // Continue with client-side cleanup even if server logout fails
+      console.warn('Server logout failed:', error.message);
     }
-
-    // Always clear client-side session
+    
+    // Always clear client-side storage
     sessionStorage.removeItem('accessToken');
     sessionStorage.removeItem('refreshToken');
     sessionStorage.removeItem('user');
     sessionStorage.removeItem('loginTime');
     sessionStorage.removeItem('tokenExpiresAt');
+    sessionStorage.removeItem('lastActivity');
     
-    // Clean up any legacy localStorage tokens
-    localStorage.removeItem('accessToken');
-    localStorage.removeItem('refreshToken');
-    localStorage.removeItem('user');
-    localStorage.removeItem('loginTime');
-    
-    console.log('🔓 Client-side logout completed');
+    console.log('🔓 Logged out and cleared session');
   },
 
-  // Get current user from storage (only if session is valid)
+  // Get current user
   getCurrentUser() {
-    if (!this.isSessionValid()) {
-      this.logout(); // Clear expired session
-      return null;
-    }
-    
-    const userStr = sessionStorage.getItem('user');
-    if (!userStr) return null;
-    
     try {
-      return JSON.parse(userStr);
+      const userStr = sessionStorage.getItem('user');
+      return userStr ? JSON.parse(userStr) : null;
     } catch (error) {
-      console.error('❌ Error parsing user data:', error);
-      this.logout(); // Clear corrupted session
+      console.error('Error parsing user data:', error);
       return null;
     }
   },
 
-  // Get valid token (only if session hasn't expired)
+  // Get valid token
   getValidToken() {
-    if (!this.isSessionValid()) {
-      this.logout(); // Clear expired session
-      return null;
-    }
-    
-    return sessionStorage.getItem('accessToken');
+    const token = sessionStorage.getItem('accessToken');
+    return this.isAuthenticated() ? token : null;
   },
 
-  // Check if user is authenticated and session is valid
+  // Check if authenticated
   isAuthenticated() {
-    const token = this.getValidToken();
-    const user = sessionStorage.getItem('user');
-    return !!(token && user);
+    const token = sessionStorage.getItem('accessToken');
+    const user = this.getCurrentUser();
+    return !!(token && user && this.isSessionValid());
   },
 
-  // Check if session is still valid
+  // Check if session is still valid - FIXED VERSION
   isSessionValid() {
-    const loginTime = sessionStorage.getItem('loginTime');
     const tokenExpiresAt = sessionStorage.getItem('tokenExpiresAt');
+    const loginTime = sessionStorage.getItem('loginTime');
     
-    if (!loginTime) return false;
+    if (!loginTime || !tokenExpiresAt) {
+      console.log('❌ Missing session timestamps');
+      return false;
+    }
     
     const now = Date.now();
-    const loginTimestamp = parseInt(loginTime);
+    const expirationTime = parseInt(tokenExpiresAt);
     
-    // Check against token expiration if available
-    if (tokenExpiresAt) {
-      const expirationTime = parseInt(tokenExpiresAt);
-      return now < expirationTime;
+    // Check if token has expired
+    if (now >= expirationTime) {
+      console.log('❌ Session expired - token expired at:', new Date(expirationTime));
+      return false;
     }
     
-    // Fallback to session timeout
+    // Additional safety check - max 8 hour session regardless of token
+    const loginTimestamp = parseInt(loginTime);
+    const maxSessionTime = 8 * 60 * 60 * 1000; // 8 hours
     const sessionAge = now - loginTimestamp;
-    return sessionAge < SESSION_TIMEOUT;
+    
+    if (sessionAge > maxSessionTime) {
+      console.log('❌ Session expired - exceeded maximum session time');
+      return false;
+    }
+    
+    return true;
   },
 
-  // Get remaining session time in minutes
+  // Get remaining session time in minutes - FIXED VERSION
   getRemainingSessionTime() {
     const tokenExpiresAt = sessionStorage.getItem('tokenExpiresAt');
-    const loginTime = sessionStorage.getItem('loginTime');
     
-    if (!loginTime) return 0;
+    if (!tokenExpiresAt) {
+      return 0;
+    }
     
     const now = Date.now();
-    let expirationTime;
+    const expirationTime = parseInt(tokenExpiresAt);
+    const remainingTime = expirationTime - now;
     
-    if (tokenExpiresAt) {
-      expirationTime = parseInt(tokenExpiresAt);
-    } else {
-      expirationTime = parseInt(loginTime) + SESSION_TIMEOUT;
+    if (remainingTime <= 0) {
+      return 0;
     }
     
-    const remainingTime = expirationTime - now;
-    return Math.max(0, Math.floor(remainingTime / (1000 * 60)));
+    return Math.floor(remainingTime / (1000 * 60));
   },
 
-  // Extend session by updating login time
+  // Extend session by updating activity time - FIXED VERSION
   extendSession() {
-    if (this.isAuthenticated()) {
-      sessionStorage.setItem('loginTime', Date.now().toString());
-      console.log('🕐 Session extended');
+    if (!this.isAuthenticated()) {
+      return false;
     }
+    
+    const now = Date.now();
+    const lastExtension = lastActivityExtension;
+    
+    // Only extend if it's been more than 5 minutes since last extension
+    if (now - lastExtension < ACTIVITY_EXTEND_INTERVAL) {
+      return false;
+    }
+    
+    // Update last activity time
+    sessionStorage.setItem('lastActivity', now.toString());
+    lastActivityExtension = now;
+    
+    // Extend the token expiration by 30 minutes
+    const currentExpiration = parseInt(sessionStorage.getItem('tokenExpiresAt') || '0');
+    const newExpiration = Math.max(currentExpiration, now + SESSION_TIMEOUT);
+    
+    sessionStorage.setItem('tokenExpiresAt', newExpiration.toString());
+    
+    console.log('🕐 Session extended to:', new Date(newExpiration));
+    return true;
   },
 
   // Get session information
   getSessionInfo() {
     const loginTime = sessionStorage.getItem('loginTime');
     const tokenExpiresAt = sessionStorage.getItem('tokenExpiresAt');
+    const lastActivity = sessionStorage.getItem('lastActivity');
     const token = sessionStorage.getItem('accessToken');
     
     return {
@@ -217,6 +238,7 @@ const authService = {
       hasToken: !!token,
       loginTime: loginTime ? new Date(parseInt(loginTime)) : null,
       expiresAt: tokenExpiresAt ? new Date(parseInt(tokenExpiresAt)) : null,
+      lastActivity: lastActivity ? new Date(parseInt(lastActivity)) : null,
       remainingMinutes: this.getRemainingSessionTime()
     };
   },
@@ -252,18 +274,26 @@ const authService = {
       const response = await api.post('/auth/refresh', { refreshToken });
       const { accessToken, refreshToken: newRefreshToken, expiresAt } = response.data;
       
+      const now = Date.now();
+      
       // Update tokens and session
       sessionStorage.setItem('accessToken', accessToken);
       if (newRefreshToken) {
         sessionStorage.setItem('refreshToken', newRefreshToken);
       }
-      sessionStorage.setItem('loginTime', Date.now().toString());
+      sessionStorage.setItem('lastActivity', now.toString());
       
+      // Update expiration time
+      let expirationTime;
       if (expiresAt) {
-        sessionStorage.setItem('tokenExpiresAt', new Date(expiresAt).getTime().toString());
+        expirationTime = new Date(expiresAt).getTime();
+      } else {
+        expirationTime = now + SESSION_TIMEOUT;
       }
       
-      console.log('✅ Token refreshed successfully');
+      sessionStorage.setItem('tokenExpiresAt', expirationTime.toString());
+      
+      console.log('✅ Token refreshed successfully, expires at:', new Date(expirationTime));
       return { success: true };
     } catch (error) {
       console.error('❌ Token refresh failed:', error.response?.data || error.message);

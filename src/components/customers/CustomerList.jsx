@@ -9,7 +9,7 @@ import { LoadingSpinner } from '../common/ui/LoadingSpinner';
 import { Button } from '../common/ui/Button';
 import { EmptyState } from '../common/layout/EmptyState';
 import CustomerFilters from './CustomerFilters';
-import CustomerTable from './CustomerTable';
+import CustomerTable from './CustomerCards';
 import CustomerStats from './CustomerStats';
 import AddCustomerModal from './modals/AddCustomerModal';
 import EditCustomerModal from './modals/EditCustomerModal';
