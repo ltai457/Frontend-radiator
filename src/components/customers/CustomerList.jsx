@@ -19,6 +19,22 @@ const CustomerList = () => {
   const { user } = useAuth();
   const { customers, loading, error, createCustomer, updateCustomer, deleteCustomer, getCustomerById } = useCustomers();
   
+  // Normalize admin across number/string/array cases - COPIED FROM RADIATORLIST
+  const isAdmin =
+    user?.role === 1 ||
+    user?.role === '1' ||
+    user?.role === 'Admin' ||
+    user?.role === 'admin' ||
+    (Array.isArray(user?.role) && user.role.map(String).some(r => r.toLowerCase() === 'admin' || r === '1'));
+
+  // DEBUG: Let's see what we're working with
+  console.log('=== DEBUGGING USER ROLE ===');
+  console.log('User object:', user);
+  console.log('User role:', user?.role);
+  console.log('Type of role:', typeof user?.role);
+  console.log('isAdmin check result:', isAdmin);
+  console.log('==========================');
+  
   const addModal = useModal();
   const editModal = useModal();
   const detailsModal = useModal();
@@ -88,7 +104,7 @@ const CustomerList = () => {
         title="Customers"
         icon={Users}
         actions={
-          user?.role === 'Admin' && (
+          isAdmin && (
             <Button
               onClick={() => addModal.openModal()}
               icon={Plus}

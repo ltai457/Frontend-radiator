@@ -22,11 +22,12 @@ const CustomerForm = ({
   });
   const [errors, setErrors] = useState({});
 
+  // FIXED: Use JSON.stringify to properly compare initialData
   useEffect(() => {
-    if (initialData) {
+    if (initialData && Object.keys(initialData).length > 0) {
       setFormData(prev => ({ ...prev, ...initialData }));
     }
-  }, [initialData]);
+  }, [JSON.stringify(initialData)]); // This prevents infinite loops
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
