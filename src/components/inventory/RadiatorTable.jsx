@@ -37,7 +37,7 @@ const RadiatorTable = ({
   const userIsAdmin = !!isAdmin;
 
   return (
-    <Table className="min-w-[1100px] table-auto">
+    <Table className="min-w-[1300px] table-auto">
       <TableHeader className="table-header-group">
         <TableRow className="table-row">
           <TableHead className="table-cell w-36 text-center align-middle">
@@ -53,7 +53,14 @@ const RadiatorTable = ({
             Year
           </TableHead>
 
-          {/* New columns */}
+          {/* NEW COLUMNS */}
+          <TableHead className="table-cell text-center align-middle">
+            Type
+          </TableHead>
+          <TableHead className="table-cell text-center align-middle">
+            Dimensions
+          </TableHead>
+
           <TableHead className="table-cell text-center align-middle">
             Retail
           </TableHead>
@@ -80,6 +87,12 @@ const RadiatorTable = ({
             <TableRow key={radiator.id}>
               <TableCell>
                 <div className="font-medium text-gray-900">{radiator.name}</div>
+                {/* Show notes as subtitle if available */}
+                {radiator.notes && (
+                  <div className="text-xs text-gray-500 mt-1 truncate max-w-48">
+                    {radiator.notes}
+                  </div>
+                )}
               </TableCell>
 
               <TableCell>
@@ -96,12 +109,29 @@ const RadiatorTable = ({
                 <div className="text-sm text-gray-900">{radiator.year}</div>
               </TableCell>
 
+              {/* NEW CELLS */}
+              <TableCell>
+                <div className="text-sm text-gray-900">
+                  {radiator.productType && (
+                    <span className="px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
+                      {radiator.productType}
+                    </span>
+                  )}
+                  {!radiator.productType && <span className="text-gray-400">—</span>}
+                </div>
+              </TableCell>
+
+              <TableCell>
+                <div className="text-sm text-gray-900">
+                  {radiator.dimensions || <span className="text-gray-400">—</span>}
+                </div>
+              </TableCell>
+
               {/* Retail Price */}
               <TableCell className="text-center align-middle">
                 <div className="text-sm text-gray-900">
                   {fmtMoney(radiator.retailPrice)}
                 </div>
-               
               </TableCell>
 
               {/* Trade Price */}
@@ -109,7 +139,6 @@ const RadiatorTable = ({
                 <div className="text-sm text-gray-900">
                   {fmtMoney(radiator.tradePrice)}
                 </div>
-                
               </TableCell>
 
               {/* Stock */}

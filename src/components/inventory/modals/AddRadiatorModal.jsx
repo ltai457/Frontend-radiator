@@ -14,6 +14,10 @@ const emptyForm = {
   costPrice: "",
   isPriceOverridable: false,
   maxDiscountPercent: "",
+  // NEW FIELDS ADDED
+  productType: "",
+  dimensions: "",
+  notes: "",
 };
 
 const AddRadiatorModal = ({ isOpen, onClose, onSuccess, warehouses = [] }) => {
@@ -113,6 +117,11 @@ const AddRadiatorModal = ({ isOpen, onClose, onSuccess, warehouses = [] }) => {
         isPriceOverridable: !!form.isPriceOverridable,
         maxDiscountPercent: num(form.maxDiscountPercent),
         stock: initialStock, // key used by service to map to InitialStock[…]
+        
+        // NEW FIELDS ADDED
+        productType: form.productType.trim() || null,
+        dimensions: form.dimensions.trim() || null,
+        notes: form.notes.trim() || null,
       };
 
       // onSuccess is provided by parent and must return true/false
@@ -212,6 +221,59 @@ const AddRadiatorModal = ({ isOpen, onClose, onSuccess, warehouses = [] }) => {
               disabled={saving}
             />
           </div>
+
+          {/* NEW FIELDS SECTION */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Product Type
+            </label>
+            <select
+              value={form.productType}
+              onChange={(e) => updateField("productType", e.target.value)}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              disabled={saving}
+            >
+              <option value="">Select Type</option>
+              <option value="Vehicle">Vehicle (រថយន្ត)</option>
+              <option value="Truck">Truck (ឡាន)</option>
+              <option value="Machinery">Machinery (យន្តរឧបករណ៍)</option>
+              <option value="Generator">Generator (ម៉ាស៊ីនភ្លើង)</option>
+              <option value="Forklift">Forklift (រទេះអូស)</option>
+              <option value="Harvester">Harvester (ម៉ាស៊ីនច្រូត)</option>
+              <option value="Excavator">Excavator (ឧស្កា)</option>
+              <option value="Tractor">Tractor (ត្រាក)</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
+
+          <div className="sm:col-span-2">
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Dimensions
+            </label>
+            <input
+              type="text"
+              value={form.dimensions}
+              onChange={(e) => updateField("dimensions", e.target.value)}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              placeholder="e.g., 250x240x40mm, 500x600, or 1020x430x100"
+              disabled={saving}
+            />
+          </div>
+
+          <div className="sm:col-span-2">
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Notes (Optional)
+            </label>
+            <textarea
+              value={form.notes}
+              onChange={(e) => updateField("notes", e.target.value)}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              placeholder="Additional product information..."
+              rows={2}
+              disabled={saving}
+            />
+          </div>
+          {/* END NEW FIELDS SECTION */}
         </div>
 
         {/* Image Upload */}

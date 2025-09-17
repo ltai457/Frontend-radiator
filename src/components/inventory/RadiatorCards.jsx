@@ -69,14 +69,39 @@ const RadiatorCards = ({ radiators, onEdit, onDelete, onEditStock, isAdmin }) =>
             </div>
 
             {/* Main Info */}
-            <div className="flex-1 space-y-1">
+            <div className="flex-1 space-y-2">
               <h3 className="text-lg font-semibold text-gray-900">{r.name}</h3>
-              <p className="text-sm text-gray-600">Brand: {r.brand}</p>
-              <p className="text-sm text-gray-600">Code: {r.code}</p>
-              <p className="text-sm text-gray-600">Year: {r.year}</p>
+              
+              <div className="space-y-1">
+                <p className="text-sm text-gray-600">Brand: {r.brand}</p>
+                <p className="text-sm text-gray-600">Code: {r.code}</p>
+                <p className="text-sm text-gray-600">Year: {r.year}</p>
+
+                {/* NEW FIELDS DISPLAY */}
+                {r.productType && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-gray-500">Type:</span>
+                    <span className="px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
+                      {r.productType}
+                    </span>
+                  </div>
+                )}
+
+                {r.dimensions && (
+                  <p className="text-sm text-gray-600">
+                    <span className="font-medium">Dimensions:</span> {r.dimensions}
+                  </p>
+                )}
+
+                {r.notes && (
+                  <p className="text-sm text-gray-500 italic line-clamp-2">
+                    "{r.notes}"
+                  </p>
+                )}
+              </div>
 
               {/* Prices */}
-              <div className="mt-2">
+              <div className="mt-3 pt-2 border-t border-gray-100">
                 <p className="text-sm text-gray-900">
                   <span className="font-medium">Retail: </span>
                   {fmtMoney(r.retailPrice)}
@@ -96,7 +121,7 @@ const RadiatorCards = ({ radiators, onEdit, onDelete, onEditStock, isAdmin }) =>
                 {r.stock && (
                   <div className="mt-1 text-xs text-gray-500 flex flex-wrap gap-2">
                     {Object.entries(r.stock).map(([wh, qty]) => (
-                      <span key={wh}>
+                      <span key={wh} className="bg-gray-100 px-2 py-1 rounded">
                         {wh}: {qty}
                       </span>
                     ))}
@@ -106,7 +131,7 @@ const RadiatorCards = ({ radiators, onEdit, onDelete, onEditStock, isAdmin }) =>
             </div>
 
             {/* Actions */}
-            <div className="mt-4 flex justify-end gap-2">
+            <div className="mt-4 flex justify-end gap-2 pt-3 border-t border-gray-100">
               <Button
                 variant="ghost"
                 size="sm"

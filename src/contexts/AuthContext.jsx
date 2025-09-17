@@ -1,5 +1,7 @@
+// Replace your AuthContext.jsx with this less aggressive version:
+
 // src/contexts/AuthContext.jsx
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
 import authService from '../api/authService';
 
 const AuthContext = createContext();
@@ -25,12 +27,9 @@ export const AuthProvider = ({ children }) => {
       const currentUser = authService.getCurrentUser();
       if (currentUser && authService.isAuthenticated()) {
         console.log('✅ Found valid session for user:', currentUser.username);
-        console.log('📊 Session info:', authService.getSessionInfo());
         setUser(currentUser);
       } else {
         console.log('❌ No valid session found');
-        // Clear any invalid/expired sessions
-        authService.logout();
         setUser(null);
       }
       setLoading(false);
@@ -39,30 +38,32 @@ export const AuthProvider = ({ children }) => {
     initializeAuth();
   }, []);
 
-  // Session timeout checking with better intervals
+  // Less aggressive session timeout checking (every 5 minutes instead of 1 minute)
   useEffect(() => {
     if (!user) return;
 
     const checkSession = () => {
+      // Only check if session is still valid, don't auto-logout
       if (!authService.isSessionValid()) {
-        console.log('⏰ Session expired');
-        handleSessionExpired();
+        console.log('⏰ Session appears expired, but allowing user to continue');
+        // Just show warning instead of auto-logout
+        setSessionWarning(true);
         return;
       }
 
       const remainingTime = authService.getRemainingSessionTime();
       console.log(`⏱️ Session time remaining: ${remainingTime} minutes`);
       
-      // Show warning when 5 minutes left
-      if (remainingTime <= 5 && remainingTime > 0) {
+      // Show warning when 10 minutes left (increased from 5)
+      if (remainingTime <= 10 && remainingTime > 0) {
         setSessionWarning(true);
       } else {
         setSessionWarning(false);
       }
     };
 
-    // Check session every 30 seconds instead of every minute for better responsiveness
-    const sessionInterval = setInterval(checkSession, 30000);
+    // Check session every 5 minutes instead of every minute
+    const sessionInterval = setInterval(checkSession, 5 * 60 * 1000);
     
     // Check immediately
     checkSession();
@@ -70,47 +71,36 @@ export const AuthProvider = ({ children }) => {
     return () => clearInterval(sessionInterval);
   }, [user]);
 
-  // Auto-logout on session expiry
-  const handleSessionExpired = useCallback(() => {
-    console.log('🚨 Session expired, logging out...');
+  // Manual session expiry handler (only called when user action fails)
+  const handleSessionExpired = () => {
     authService.logout();
     setUser(null);
     setSessionWarning(false);
     
-    // Show notification and redirect
-    setTimeout(() => {
-      if (window.confirm('Your session has expired for security reasons. Please login again.')) {
-        window.location.href = '/login';
-      } else {
-        window.location.href = '/login';
-      }
-    }, 100);
-  }, []);
+    // Show notification
+    if (window.confirm('Your session has expired for security reasons. Please login again.')) {
+      window.location.reload();
+    }
+  };
 
-  // Activity tracking to extend session - IMPROVED VERSION
+  // Activity tracking to extend session (less frequent)
   useEffect(() => {
     if (!user) return;
 
-    // More comprehensive activity tracking
-    const activities = [
-      'mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 
-      'click', 'focus', 'blur', 'resize', 'visibilitychange'
-    ];
-    
-    let activityTimeout;
+    const activities = ['click', 'keypress']; // Reduced from many events to just essential ones
+    let lastActivity = Date.now();
     
     const extendSessionOnActivity = () => {
-      // Debounce activity tracking to prevent excessive calls
-      clearTimeout(activityTimeout);
-      activityTimeout = setTimeout(() => {
+      const now = Date.now();
+      // Only extend session if more than 5 minutes since last extension
+      if (now - lastActivity > 5 * 60 * 1000) {
         if (authService.isAuthenticated()) {
-          const extended = authService.extendSession();
-          if (extended) {
-            console.log('🔄 Session extended due to user activity');
-            setSessionWarning(false); // Hide warning on activity
-          }
+          authService.extendSession();
+          setSessionWarning(false);
+          lastActivity = now;
+          console.log('🕐 Session extended due to user activity');
         }
-      }, 1000); // Wait 1 second after activity stops
+      }
     };
 
     // Add event listeners
@@ -119,39 +109,12 @@ export const AuthProvider = ({ children }) => {
     });
 
     return () => {
-      clearTimeout(activityTimeout);
       // Clean up event listeners
       activities.forEach(activity => {
         document.removeEventListener(activity, extendSessionOnActivity);
       });
     };
   }, [user]);
-
-  // Page visibility change handler - extend session when page becomes visible
-  useEffect(() => {
-    if (!user) return;
-
-    const handleVisibilityChange = () => {
-      if (!document.hidden && authService.isAuthenticated()) {
-        console.log('👁️ Page became visible, checking session...');
-        const sessionInfo = authService.getSessionInfo();
-        console.log('📊 Current session info:', sessionInfo);
-        
-        if (!sessionInfo.isValid) {
-          handleSessionExpired();
-        } else {
-          // Extend session when returning to the page
-          authService.extendSession();
-        }
-      }
-    };
-
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    
-    return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-    };
-  }, [user, handleSessionExpired]);
 
   const login = async (username, password) => {
     console.log('🚀 Attempting login for user:', username);
@@ -200,14 +163,9 @@ export const AuthProvider = ({ children }) => {
 
   const extendSession = () => {
     if (user && authService.isAuthenticated()) {
-      const extended = authService.extendSession();
-      if (extended) {
-        setSessionWarning(false);
-        console.log('✅ Session manually extended');
-      }
-      return extended;
+      authService.extendSession();
+      setSessionWarning(false);
     }
-    return false;
   };
 
   const refreshUserSession = async () => {
@@ -221,14 +179,21 @@ export const AuthProvider = ({ children }) => {
         return true;
       } else {
         console.error('❌ Session refresh failed:', result.error);
-        handleSessionExpired();
+        // Don't automatically logout, let user try to continue
+        setSessionWarning(true);
         return false;
       }
     } catch (error) {
       console.error('❌ Session refresh error:', error);
-      handleSessionExpired();
+      setSessionWarning(true);
       return false;
     }
+  };
+
+  // Manual logout function for when API calls fail with 401
+  const handleApiUnauthorized = () => {
+    console.log('🔓 API returned 401, forcing logout');
+    handleSessionExpired();
   };
 
   const value = {
@@ -240,6 +205,7 @@ export const AuthProvider = ({ children }) => {
     sessionWarning,
     extendSession,
     refreshUserSession,
+    handleApiUnauthorized, // Expose this for components to call when needed
     remainingTime: user ? authService.getRemainingSessionTime() : 0,
     sessionInfo: user ? authService.getSessionInfo() : null
   };

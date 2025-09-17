@@ -1,3 +1,4 @@
+// src/components/sales/modals/SaleDetailsModal.jsx
 import React from 'react';
 import { FileText } from 'lucide-react';
 import { Modal } from '../../common/ui/Modal';
@@ -47,10 +48,7 @@ const SaleDetailsModal = ({ isOpen, onClose, sale, onViewReceipt }) => {
                 <span className="text-gray-600">Payment:</span>
                 <span className="font-medium">{sale.paymentMethod}</span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">Status:</span>
-                <StatusBadge status={sale.status} variant={getStatusVariant(sale.status)} />
-              </div>
+              
             </div>
           </div>
 
@@ -60,7 +58,9 @@ const SaleDetailsModal = ({ isOpen, onClose, sale, onViewReceipt }) => {
               <div>
                 <span className="text-gray-600">Name:</span>
                 <div className="font-medium">
-                  {sale.customer ? `${sale.customer.firstName} ${sale.customer.lastName}` : sale.customerName}
+                  {sale.customer ? 
+                    `${sale.customer.firstName} ${sale.customer.lastName}` : 
+                    sale.customerName}
                 </div>
               </div>
               {sale.customer?.email && (
@@ -79,7 +79,7 @@ const SaleDetailsModal = ({ isOpen, onClose, sale, onViewReceipt }) => {
           </div>
         </div>
 
-        {/* Items */}
+        {/* Items Table - FIXED */}
         {sale.items && sale.items.length > 0 && (
           <div>
             <h4 className="font-medium text-gray-900 mb-3">Items Purchased</h4>
@@ -97,9 +97,35 @@ const SaleDetailsModal = ({ isOpen, onClose, sale, onViewReceipt }) => {
                 <tbody className="divide-y divide-gray-200">
                   {sale.items.map((item, index) => (
                     <tr key={index}>
-                      <td className="px-4 py-2 text-sm text-right">{item.quantity}</td>
-                      <td className="px-4 py-2 text-sm text-right">{formatCurrency(item.unitPrice)}</td>
-                      <td className="px-4 py-2 text-sm text-right font-medium">{formatCurrency(item.totalPrice)}</td>
+                      {/* Product Information */}
+                      <td className="px-4 py-2 text-sm">
+                        <div className="font-medium text-gray-900">
+                          {item.radiator?.name || item.radiatorName || 'Unknown Product'}
+                        </div>
+                        <div className="text-xs text-gray-500">
+                          {item.radiator?.brand || item.brand} - {item.radiator?.code || item.radiatorCode}
+                        </div>
+                      </td>
+                      
+                      {/* Warehouse Information */}
+                      <td className="px-4 py-2 text-sm text-gray-600">
+                        {item.warehouse?.name || item.warehouseName || item.warehouse?.code || item.warehouseCode || 'N/A'}
+                      </td>
+                      
+                      {/* Quantity */}
+                      <td className="px-4 py-2 text-sm text-right">
+                        {item.quantity}
+                      </td>
+                      
+                      {/* Unit Price */}
+                      <td className="px-4 py-2 text-sm text-right">
+                        {formatCurrency(item.unitPrice)}
+                      </td>
+                      
+                      {/* Total Price */}
+                      <td className="px-4 py-2 text-sm text-right font-medium">
+                        {formatCurrency(item.totalPrice)}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
