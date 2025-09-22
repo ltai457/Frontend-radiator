@@ -8,25 +8,12 @@ const fmtMoney = (n) =>
     ? new Intl.NumberFormat(undefined, { style: "currency", currency: "NZD" }).format(n)
     : "—";
 
-const RadiatorCards = ({ radiators, onEdit, onDelete, onEditStock, isAdmin }) => {
-  const getTotalStock = (stock) => {
-    if (!stock) return 0;
-    return Object.values(stock).reduce((total, qty) => total + (qty || 0), 0);
-  };
-
-  const getStockColor = (totalStock) => {
-    if (totalStock === 0) return "text-red-600";
-    if (totalStock <= 5) return "text-yellow-600";
-    return "text-green-600";
-  };
-
+const RadiatorCards = ({ radiators, onEdit, onDelete, isAdmin }) => {
   const userIsAdmin = !!isAdmin;
 
   return (
     <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
       {radiators.map((r) => {
-        const totalStock = getTotalStock(r.stock);
-
         return (
           <div
             key={r.id}
@@ -132,34 +119,10 @@ const RadiatorCards = ({ radiators, onEdit, onDelete, onEditStock, isAdmin }) =>
                   {fmtMoney(r.tradePrice)}
                 </p>
               </div>
-
-              {/* Stock */}
-              <div className="mt-2 text-sm">
-                <span className={`font-medium ${getStockColor(totalStock)}`}>
-                  {totalStock} units
-                </span>
-                {r.stock && (
-                  <div className="mt-1 text-xs text-gray-500 flex flex-wrap gap-2">
-                    {Object.entries(r.stock).map(([wh, qty]) => (
-                      <span key={wh} className="bg-gray-100 px-2 py-1 rounded">
-                        {wh}: {qty}
-                      </span>
-                    ))}
-                  </div>
-                )}
-              </div>
             </div>
 
             {/* Actions */}
             <div className="mt-4 flex justify-end gap-2 pt-3 border-t border-gray-100">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => onEditStock(r)}
-                icon={Package}
-                className="p-1 text-blue-600 hover:text-blue-800"
-                title="Edit Stock"
-              />
               {userIsAdmin && (
                 <>
                   <Button

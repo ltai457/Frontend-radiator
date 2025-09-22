@@ -13,6 +13,7 @@ export const useRadiators = () => {
     setError('');
     
     try {
+      // Back to the original working method
       const result = await radiatorService.getAll();
       if (result.success) {
         setRadiators(result.data);
@@ -139,4 +140,4 @@ export const useRadiators = () => {
     getRadiatorImages,
     uploadRadiatorImage
   };
-}
+};
