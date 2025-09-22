@@ -1,7 +1,6 @@
 import React from "react";
 import { Edit, Trash2, Package } from "lucide-react";
 import { Button } from "../common/ui/Button";
-import RadiatorImage from "./RadiatorImage"; // Import our image component
 
 // Money formatter
 const fmtMoney = (n) =>
@@ -33,35 +32,56 @@ const RadiatorCards = ({ radiators, onEdit, onDelete, onEditStock, isAdmin }) =>
             key={r.id}
             className="rounded-2xl border border-gray-200 bg-white shadow-sm hover:shadow-md transition p-4 flex flex-col"
           >
-            {/* UPDATED: Real image instead of placeholder */}
-            <div className="w-full h-40 bg-gray-100 rounded-lg flex items-center justify-center mb-4 overflow-hidden">
+            {/* FIXED: Show full image with consistent container size */}
+            <div 
+              className="w-full bg-gray-100 rounded-lg mb-4 overflow-hidden relative flex items-center justify-center"
+              style={{ 
+                height: '160px', 
+                minHeight: '160px', 
+                maxHeight: '160px' 
+              }}
+            >
               {r.primaryImageUrl || r.imageUrl ? (
-                <div className="relative w-full h-full">
+                <>
                   <img
                     src={r.primaryImageUrl || r.imageUrl}
                     alt={r.name}
-                    className="w-full h-full object-cover rounded-lg"
+                    className="max-w-full max-h-full object-contain"
+                    style={{ 
+                      maxWidth: '100%', 
+                      maxHeight: '160px', 
+                      objectFit: 'contain' 
+                    }}
                     onError={(e) => {
                       // If image fails to load, show placeholder
                       e.target.style.display = 'none';
-                      e.target.nextSibling.style.display = 'flex';
+                      e.target.parentNode.querySelector('.fallback-placeholder').style.display = 'flex';
                     }}
                   />
                   {/* Fallback placeholder (hidden by default) */}
-                  <div className="absolute inset-0 bg-gray-100 rounded-lg flex items-center justify-center" style={{ display: 'none' }}>
-                    <Package className="w-8 h-8 text-gray-400" />
+                  <div 
+                    className="fallback-placeholder absolute inset-0 bg-gray-100 rounded-lg flex items-center justify-center" 
+                    style={{ display: 'none', height: '160px' }}
+                  >
+                    <div className="text-center">
+                      <Package className="w-8 h-8 text-gray-400 mx-auto mb-1" />
+                      <span className="text-xs text-gray-500">Image failed to load</span>
+                    </div>
                   </div>
                   
                   {/* Image count badge if multiple images */}
                   {r.imageCount > 1 && (
-                    <div className="absolute top-2 right-2 bg-black bg-opacity-70 text-white text-xs px-2 py-1 rounded-full">
+                    <div className="absolute top-2 right-2 bg-black bg-opacity-70 text-white text-xs px-2 py-1 rounded-full z-10">
                       +{r.imageCount - 1}
                     </div>
                   )}
-                </div>
+                </>
               ) : (
                 // No image placeholder
-                <div className="w-full h-full flex flex-col items-center justify-center text-gray-400">
+                <div 
+                  className="w-full flex flex-col items-center justify-center text-gray-400 bg-gray-100 rounded-lg"
+                  style={{ height: '160px' }}
+                >
                   <Package className="w-8 h-8 mb-2" />
                   <span className="text-xs">No image</span>
                 </div>
@@ -70,7 +90,7 @@ const RadiatorCards = ({ radiators, onEdit, onDelete, onEditStock, isAdmin }) =>
 
             {/* Main Info */}
             <div className="flex-1 space-y-2">
-              <h3 className="text-lg font-semibold text-gray-900">{r.name}</h3>
+              <h3 className="text-lg font-semibold text-gray-900 line-clamp-2">{r.name}</h3>
               
               <div className="space-y-1">
                 <p className="text-sm text-gray-600">Brand: {r.brand}</p>

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { SearchInput } from '../common/ui/SearchInput';
 import { Button } from '../common/ui/Button';
 
@@ -9,18 +9,38 @@ const RadiatorFilters = ({
   hasActiveFilters, 
   radiators 
 }) => {
+  // Local state for immediate search input display
+  const [searchInput, setSearchInput] = useState(filters.search || '');
+  
+  // Update local input when external filters change (e.g., when cleared)
+  useEffect(() => {
+    setSearchInput(filters.search || '');
+  }, [filters.search]);
+
   // Get unique brands and years for filter options
   const brands = [...new Set(radiators.map(r => r.brand))].sort();
   const years = [...new Set(radiators.map(r => r.year))].sort((a, b) => b - a);
+
+  const handleSearchChange = (value) => {
+    // Update input immediately for responsive UI
+    setSearchInput(value);
+    // This will be debounced by useFilters hook
+    onFilterChange('search', value);
+  };
+
+  const handleSearchClear = () => {
+    setSearchInput('');
+    onFilterChange('search', '');
+  };
 
   return (
     <div className="bg-white rounded-lg shadow p-4">
       <div className="flex flex-col lg:flex-row gap-4">
         <div className="flex-1">
           <SearchInput
-            value={filters.search || ''}
-            onChange={(value) => onFilterChange('search', value)}
-            onClear={() => onFilterChange('search', '')}
+            value={searchInput}
+            onChange={handleSearchChange}
+            onClear={handleSearchClear}
             placeholder="Search radiators..."
           />
         </div>
