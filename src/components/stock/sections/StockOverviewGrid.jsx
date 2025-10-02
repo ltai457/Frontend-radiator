@@ -8,10 +8,11 @@ export default function StockOverviewGrid({
   setSelectedWarehouse,
   getTotalStock,
 }) {
-  const totalAcrossAll = (radiators || []).reduce(
-    (t, r) => t + getTotalStock(r.stock),
-    0
-  );
+  // Always calculate total across ALL warehouses (fixed number)
+  const totalAcrossAll = (radiators || []).reduce((t, r) => {
+    if (!r.stock) return t;
+    return t + Object.values(r.stock).reduce((sum, qty) => sum + (qty || 0), 0);
+  }, 0);
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">

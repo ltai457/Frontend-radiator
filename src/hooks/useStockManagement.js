@@ -10,7 +10,7 @@ export function useStockManagement() {
 
   const [selectedWarehouse, setSelectedWarehouse] = useState("all");
   const [searchTerm, setSearchTerm] = useState("");
-  const [filterLowStock, setFilterLowStock] = useState(false);
+  const [stockStatusFilter, setStockStatusFilter] = useState("all"); // NEW: 'all' | 'good' | 'low' | 'out'
 
   const [editMode, setEditMode] = useState(false);
   const [editingStocks, setEditingStocks] = useState({});
@@ -62,7 +62,10 @@ export function useStockManagement() {
 
   const filteredRadiators = useMemo(() => {
     const term = (searchTerm || "").toLowerCase();
-    return (radiators || []).filter((r) => {
+    
+    // Filter radiators
+    let filtered = (radiators || []).filter((r) => {
+      // Search filter
       const matches =
         !term ||
         (r?.name || "").toLowerCase().includes(term) ||
@@ -70,19 +73,54 @@ export function useStockManagement() {
         (r?.brand || "").toLowerCase().includes(term);
       if (!matches) return false;
 
-      if (!filterLowStock) return true;
-
-      if (selectedWarehouse === "all") {
-        const vals = Object.values(r?.stock || {});
-        const hasLow = vals.some((q) => q > 0 && q <= 5);
-        const hasOut = vals.some((q) => q === 0);
-        return hasLow || hasOut;
-      } else {
-        const s = r?.stock?.[selectedWarehouse] ?? 0;
-        return s === 0 || (s > 0 && s <= 5);
+      // Stock status filter
+      if (stockStatusFilter !== "all") {
+        const totalStock = getTotalStock(r.stock);
+        
+        switch (stockStatusFilter) {
+          case "good":
+            if (totalStock <= 5) return false;
+            break;
+          case "low":
+            if (totalStock === 0 || totalStock > 5) return false;
+            break;
+          case "out":
+            if (totalStock !== 0) return false;
+            break;
+          default:
+            break;
+        }
       }
+
+      return true;
     });
-  }, [radiators, searchTerm, filterLowStock, selectedWarehouse]);
+
+    // Sort by stock status: Good (6+) → Low (1-5) → Out (0)
+    filtered.sort((a, b) => {
+      const stockA = getTotalStock(a.stock);
+      const stockB = getTotalStock(b.stock);
+      
+      // Define priority: Good = 0, Low = 1, Out = 2
+      const getPriority = (stock) => {
+        if (stock > 5) return 0; // Good stock
+        if (stock >= 1) return 1; // Low stock
+        return 2; // Out of stock
+      };
+      
+      const priorityA = getPriority(stockA);
+      const priorityB = getPriority(stockB);
+      
+      // Sort by priority first
+      if (priorityA !== priorityB) {
+        return priorityA - priorityB;
+      }
+      
+      // If same priority, sort by stock quantity (descending)
+      return stockB - stockA;
+    });
+
+    return filtered;
+  }, [radiators, searchTerm, stockStatusFilter, selectedWarehouse, getTotalStock]);
 
   // edit mode actions
   const handleEditMode = useCallback(() => {
@@ -146,9 +184,9 @@ export function useStockManagement() {
     // data
     warehouses, radiators, loading, error,
     // ui state
-    selectedWarehouse, searchTerm, filterLowStock, editMode, editingStocks, updating,
+    selectedWarehouse, searchTerm, stockStatusFilter, editMode, editingStocks, updating,
     // setters
-    setSelectedWarehouse, setSearchTerm, setFilterLowStock,
+    setSelectedWarehouse, setSearchTerm, setStockStatusFilter,
     // derived & helpers
     filteredRadiators, getTotalStock, getStockStatus, getDisplayStock,
     // actions
