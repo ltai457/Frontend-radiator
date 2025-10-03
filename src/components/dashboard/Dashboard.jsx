@@ -1,4 +1,5 @@
 // src/components/dashboard/Dashboard.jsx
+// REPLACE YOUR EXISTING FILE
 import React, { useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
@@ -9,9 +10,9 @@ import CustomerList from '../customers/CustomerList';
 import SalesManagement from '../sales/SalesManagement';
 import RadiatorList from '../inventory/RadiatorList';
 import WarehouseStock from '../stock/StockManagementPage';
-import WarehouseManagement from '../warehouse/WarehouseManagement'; 
+import WarehouseManagement from '../warehouse/WarehouseManagement';
 import StockManagement from '../stock/StockManagementPage';
-
+import UserManagement from '../users/UserManagement'; // NEW IMPORT
 
 // Check if we're in testing mode
 const TESTING_MODE = false; // Should match the setting in AuthContext
@@ -21,9 +22,17 @@ const Dashboard = () => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('overview');
 
+  // Check if user is admin
+  const isAdmin =
+    user?.role === 1 ||
+    user?.role === '1' ||
+    user?.role === 'Admin' ||
+    user?.role === 'admin' ||
+    (Array.isArray(user?.role) &&
+      user.role.map(String).some((r) => r.toLowerCase() === 'admin' || r === '1'));
+
   const handleLogout = () => {
     if (TESTING_MODE) {
-      // In testing mode, you might want to just show a message
       if (window.confirm('In testing mode. Do you want to go to the login page?')) {
         navigate('/login');
       }
@@ -49,6 +58,8 @@ const Dashboard = () => {
         return <WarehouseManagement />;
       case 'stock':
         return <StockManagement />;
+      case 'users': // NEW CASE
+        return <UserManagement />;
       default:
         return <DashboardOverview onNavigate={setActiveTab} />;
     }
@@ -56,7 +67,6 @@ const Dashboard = () => {
 
   return (
     <div className="min-h-screen bg-gray-100">
-      {/* Add padding-top if testing banner is shown */}
       <div className={TESTING_MODE ? "pt-8" : ""}>
         <DashboardHeader 
           user={user} 
@@ -66,6 +76,7 @@ const Dashboard = () => {
         <DashboardNavigation 
           activeTab={activeTab}
           onTabChange={setActiveTab}
+          isAdmin={isAdmin} // PASS isAdmin PROP
         />
 
         <div className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">

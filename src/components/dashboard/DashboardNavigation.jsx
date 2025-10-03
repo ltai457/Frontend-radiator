@@ -1,15 +1,21 @@
 // src/components/dashboard/DashboardNavigation.jsx
+// REPLACE YOUR EXISTING FILE
 import React from 'react';
 
-const DashboardNavigation = ({ activeTab, onTabChange }) => {
+const DashboardNavigation = ({ activeTab, onTabChange, isAdmin }) => {
   const tabs = [
     { id: 'overview', label: 'Overview' },
     { id: 'sales', label: 'Sales' },
     { id: 'customers', label: 'Customers' },
     { id: 'inventory', label: 'Inventory' },
-    { id: 'stock', label: 'Stock' } ,
-    { id: 'warehouses', label: 'Warehouses' } // Uncomment if warehouse management is added
+    { id: 'stock', label: 'Stock' },
+    { id: 'warehouses', label: 'Warehouses' }
   ];
+
+  // Add Users tab only for admins
+  if (isAdmin) {
+    tabs.push({ id: 'users', label: 'Users' });
+  }
 
   return (
     <>

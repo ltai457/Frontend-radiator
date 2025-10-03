@@ -1,3 +1,5 @@
+// src/components/common/layout/StatsGrid.jsx
+// REPLACE YOUR EXISTING FILE
 import React from 'react';
 
 export const StatsGrid = ({ stats, columns = 4 }) => {
@@ -24,26 +26,41 @@ const StatCard = ({ title, value, change, icon: Icon, color = 'blue' }) => {
     yellow: 'text-yellow-600',
     red: 'text-red-600',
     purple: 'text-purple-600',
-    orange: 'text-orange-600'
+    orange: 'text-orange-600',
+    indigo: 'text-indigo-600' // ADDED THIS
   };
+
+  const bgColors = {
+    blue: 'bg-blue-100',
+    green: 'bg-green-100',
+    yellow: 'bg-yellow-100',
+    red: 'bg-red-100',
+    purple: 'bg-purple-100',
+    orange: 'bg-orange-100',
+    indigo: 'bg-indigo-100' // ADDED THIS
+  };
+  
+  // Get color with fallback to blue if undefined
+  const textColor = colors[color] || colors.blue;
+  const bgColor = bgColors[color] || bgColors.blue;
   
   return (
     <div className="bg-white rounded-lg shadow p-4">
       <div className="flex items-center justify-between">
         <div>
-          <div className={`text-2xl font-bold ${colors[color]}`}>
+          <div className={`text-2xl font-bold ${textColor}`}>
             {value}
           </div>
           <div className="text-sm text-gray-600">{title}</div>
-          {change && (
+          {change !== undefined && (
             <div className={`text-xs ${change > 0 ? 'text-green-600' : 'text-red-600'}`}>
               {change > 0 ? '+' : ''}{change}%
             </div>
           )}
         </div>
         {Icon && (
-          <div className={`w-10 h-10 ${colors[color].replace('text-', 'bg-').replace('-600', '-100')} rounded-lg flex items-center justify-center`}>
-            <Icon className={`w-5 h-5 ${colors[color]}`} />
+          <div className={`w-10 h-10 ${bgColor} rounded-lg flex items-center justify-center`}>
+            <Icon className={`w-5 h-5 ${textColor}`} />
           </div>
         )}
       </div>

@@ -8,18 +8,34 @@ const fmtMoney = (n) =>
     ? new Intl.NumberFormat(undefined, { style: "currency", currency: "NZD" }).format(n)
     : "—";
 
-const RadiatorCards = ({ radiators, onEdit, onDelete, isAdmin }) => {
+const RadiatorCards = ({ radiators, onEdit, onDelete, onEditStock, isAdmin }) => {
   const userIsAdmin = !!isAdmin;
+
+  // Calculate total stock from all warehouses
+  const getTotalStock = (stock) => {
+    if (!stock) return 0;
+    return Object.values(stock).reduce((total, qty) => total + (qty || 0), 0);
+  };
+
+  // Get color based on stock level
+  const getStockColor = (totalStock) => {
+    if (totalStock === 0) return "text-red-600 bg-red-50 border-red-200";
+    if (totalStock <= 5) return "text-yellow-600 bg-yellow-50 border-yellow-200";
+    return "text-green-600 bg-green-50 border-green-200";
+  };
 
   return (
     <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
       {radiators.map((r) => {
+        const totalStock = getTotalStock(r.stock);
+        const stockColorClass = getStockColor(totalStock);
+
         return (
           <div
             key={r.id}
             className="rounded-2xl border border-gray-200 bg-white shadow-sm hover:shadow-md transition p-4 flex flex-col"
           >
-            {/* FIXED: Show full image with consistent container size */}
+            {/* Image Section */}
             <div 
               className="w-full bg-gray-100 rounded-lg mb-4 overflow-hidden relative flex items-center justify-center"
               style={{ 
@@ -40,12 +56,10 @@ const RadiatorCards = ({ radiators, onEdit, onDelete, isAdmin }) => {
                       objectFit: 'contain' 
                     }}
                     onError={(e) => {
-                      // If image fails to load, show placeholder
                       e.target.style.display = 'none';
                       e.target.parentNode.querySelector('.fallback-placeholder').style.display = 'flex';
                     }}
                   />
-                  {/* Fallback placeholder (hidden by default) */}
                   <div 
                     className="fallback-placeholder absolute inset-0 bg-gray-100 rounded-lg flex items-center justify-center" 
                     style={{ display: 'none', height: '160px' }}
@@ -56,7 +70,6 @@ const RadiatorCards = ({ radiators, onEdit, onDelete, isAdmin }) => {
                     </div>
                   </div>
                   
-                  {/* Image count badge if multiple images */}
                   {r.imageCount > 1 && (
                     <div className="absolute top-2 right-2 bg-black bg-opacity-70 text-white text-xs px-2 py-1 rounded-full z-10">
                       +{r.imageCount - 1}
@@ -64,7 +77,6 @@ const RadiatorCards = ({ radiators, onEdit, onDelete, isAdmin }) => {
                   )}
                 </>
               ) : (
-                // No image placeholder
                 <div 
                   className="w-full flex flex-col items-center justify-center text-gray-400 bg-gray-100 rounded-lg"
                   style={{ height: '160px' }}
@@ -84,7 +96,6 @@ const RadiatorCards = ({ radiators, onEdit, onDelete, isAdmin }) => {
                 <p className="text-sm text-gray-600">Code: {r.code}</p>
                 <p className="text-sm text-gray-600">Year: {r.year}</p>
 
-                {/* NEW FIELDS DISPLAY */}
                 {r.productType && (
                   <div className="flex items-center gap-2">
                     <span className="text-xs text-gray-500">Type:</span>
@@ -107,6 +118,27 @@ const RadiatorCards = ({ radiators, onEdit, onDelete, isAdmin }) => {
                 )}
               </div>
 
+              {/* Stock Display - NEW */}
+              <div className={`mt-3 p-2 rounded-lg border ${stockColorClass}`}>
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-xs font-medium uppercase">Stock</span>
+                  <span className="text-sm font-bold">{totalStock} units</span>
+                </div>
+                
+                {r.stock && Object.keys(r.stock).length > 0 && (
+                  <div className="flex flex-wrap gap-2 mt-1">
+                    {Object.entries(r.stock).map(([warehouse, qty]) => (
+                      <span 
+                        key={warehouse}
+                        className="text-xs bg-white px-2 py-0.5 rounded border border-gray-200"
+                      >
+                        {warehouse}: <span className="font-semibold">{qty}</span>
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+
               {/* Prices */}
               <div className="mt-3 pt-2 border-t border-gray-100">
                 <p className="text-sm text-gray-900">
@@ -123,6 +155,15 @@ const RadiatorCards = ({ radiators, onEdit, onDelete, isAdmin }) => {
 
             {/* Actions */}
             <div className="mt-4 flex justify-end gap-2 pt-3 border-t border-gray-100">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => onEditStock(r)}
+                icon={Package}
+                className="p-1 text-blue-600 hover:text-blue-800"
+                title="Edit Stock"
+              />
+              
               {userIsAdmin && (
                 <>
                   <Button
