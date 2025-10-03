@@ -60,48 +60,45 @@ api.interceptors.response.use(
 );
 
 const radiatorService = {
-  // Create WITHOUT image (JSON)
-  async create(radiatorData) {
+  // Unified create method - handles both with and without image
+  async create(radiatorData, imageFile = null) {
     try {
-      const response = await api.post("/radiators", radiatorData);
-      return { success: true, data: response.data };
-    } catch (error) {
-      return {
-        success: false,
-        error: error.response?.data?.message || error.message || "Failed to create radiator",
-      };
-    }
-  },
-
-  // Create WITH image (multipart/form-data)
-  async createWithImage(radiatorData, imageFile) {
-    try {
-      if (!imageFile) return { success: false, error: "No image file provided" };
-
+      console.log('📤 Creating radiator:', { hasImage: !!imageFile });
+      
+      // Always use FormData (works with or without image)
       const formData = new FormData();
 
-      // Match backend DTO (CreateRadiatorWithImageDto) — exact casing!
+      // Add all radiator fields
       formData.append("Brand", radiatorData.brand);
       formData.append("Code", radiatorData.code);
       formData.append("Name", radiatorData.name);
       formData.append("Year", String(Number(radiatorData.year)));
       formData.append("RetailPrice", String(Number(radiatorData.retailPrice)));
 
+      // Optional fields
       if (radiatorData.tradePrice != null) {
         formData.append("TradePrice", String(Number(radiatorData.tradePrice)));
       }
       if (radiatorData.costPrice != null) {
         formData.append("CostPrice", String(Number(radiatorData.costPrice)));
       }
+      if (radiatorData.productType) {
+        formData.append("ProductType", radiatorData.productType);
+      }
+      if (radiatorData.dimensions) {
+        formData.append("Dimensions", radiatorData.dimensions);
+      }
+      if (radiatorData.notes) {
+        formData.append("Notes", radiatorData.notes);
+      }
+      
       formData.append("IsPriceOverridable", String(!!radiatorData.isPriceOverridable));
+      
       if (radiatorData.maxDiscountPercent != null) {
-        formData.append(
-          "MaxDiscountPercent",
-          String(Number(radiatorData.maxDiscountPercent))
-        );
+        formData.append("MaxDiscountPercent", String(Number(radiatorData.maxDiscountPercent)));
       }
 
-      // Initial stock dictionary binding: InitialStock[CODE]=QTY
+      // Handle initial stock
       const stockObj = radiatorData.initialStock || radiatorData.stock;
       if (stockObj && Object.keys(stockObj).length) {
         Object.entries(stockObj).forEach(([whCode, qty]) => {
@@ -109,10 +106,12 @@ const radiatorService = {
         });
       }
 
-      // File must be named exactly like DTO property
-      formData.append("Image", imageFile, imageFile.name);
+      // Add image if provided (optional)
+      if (imageFile) {
+        formData.append("Image", imageFile, imageFile.name);
+      }
 
-      // Optional debug
+      // Debug log
       if (import.meta.env.VITE_DEBUG === "true") {
         console.log("📦 FormData contents:");
         for (const [k, v] of formData.entries()) {
@@ -124,23 +123,34 @@ const radiatorService = {
         }
       }
 
+      // Use create-with-image endpoint (works even without image)
       const response = await api.post("/radiators/create-with-image", formData);
+      console.log('✅ Radiator created successfully');
+      
       return { success: true, data: response.data };
     } catch (error) {
+      console.error('❌ Create radiator error:', error.response?.data);
       return {
         success: false,
         error:
           error.response?.data?.message ||
           error.message ||
-          "Failed to create radiator with image",
+          "Failed to create radiator",
       };
     }
   },
 
-  // Get all
-  async getAll() {
+  // Get all with optional sorting
+  async getAll(sortBy = 'createdAt', sortOrder = 'asc') {
     try {
-      const response = await api.get("/radiators");
+      // Add query parameters for backend sorting
+      const params = new URLSearchParams();
+      if (sortBy) params.append('sortBy', sortBy);
+      if (sortOrder) params.append('sortOrder', sortOrder);
+      
+      const url = `/radiators${params.toString() ? '?' + params.toString() : ''}`;
+      const response = await api.get(url);
+      
       return { success: true, data: response.data };
     } catch (error) {
       return {
@@ -212,7 +222,6 @@ const radiatorService = {
   async uploadImage(radiatorId, imageFile, isPrimary = false) {
     try {
       const formData = new FormData();
-      // NOTE: backend UploadRadiatorImageDto expects "Image" and "IsPrimary"
       formData.append("Image", imageFile, imageFile.name);
       formData.append("IsPrimary", String(!!isPrimary));
 

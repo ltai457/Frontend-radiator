@@ -1,5 +1,5 @@
-// src/components/radiators/RadiatorList.jsx
-import React, { useEffect, useState } from "react";
+// src/components/inventory/RadiatorList.jsx
+import React, { useEffect, useState, useMemo } from "react";
 import {
   Package,
   Plus,
@@ -20,9 +20,6 @@ import RadiatorCards from "./RadiatorCards";
 import RadiatorStats from "./RadiatorStats";
 import AddRadiatorModal from "./modals/AddRadiatorModal";
 import EditRadiatorModal from "./modals/EditRadiatorModal";
-
-// ⬇️ Import the service so we can call createWithImage when needed
-import radiatorService from "../../api/radiatorService";
 
 const RadiatorList = () => {
   const { user } = useAuth();
@@ -54,127 +51,90 @@ const RadiatorList = () => {
     year: "all",
   });
 
-  // remember last chosen view
+  // Sort order state
+  const [sortBy, setSortBy] = useState("newest");
+
+  // Sort filtered radiators based on selected sort option
+  const sortedRadiators = useMemo(() => {
+    const sorted = [...filteredRadiators];
+    
+    switch (sortBy) {
+      case "newest":
+        return sorted.sort((a, b) => {
+          const dateA = new Date(a.updatedAt || a.createdAt || 0);
+          const dateB = new Date(b.updatedAt || b.createdAt || 0);
+          return dateB - dateA;
+        });
+      
+      case "oldest":
+        return sorted.sort((a, b) => {
+          const dateA = new Date(a.updatedAt || a.createdAt || 0);
+          const dateB = new Date(b.updatedAt || b.createdAt || 0);
+          return dateA - dateB;
+        });
+      
+      case "name":
+        return sorted.sort((a, b) => 
+          (a.name || "").localeCompare(b.name || "")
+        );
+      
+      case "brand":
+        return sorted.sort((a, b) => 
+          (a.brand || "").localeCompare(b.brand || "")
+        );
+      
+      default:
+        return sorted;
+    }
+  }, [filteredRadiators, sortBy]);
+
   const [viewMode, setViewMode] = useState(
     () => localStorage.getItem("radiatorViewMode") || "list"
   );
+  
   useEffect(() => {
     localStorage.setItem("radiatorViewMode", viewMode);
   }, [viewMode]);
 
-  // Normalize admin across number/string/array cases
   const isAdmin =
     user?.role === 1 ||
     user?.role === "1" ||
     user?.role === "Admin" ||
     user?.role === "admin" ||
     (Array.isArray(user?.role) &&
-      user.role
-        .map(String)
-        .some((r) => r.toLowerCase() === "admin" || r === "1"));
+      user.role.map(String).some((r) => r.toLowerCase() === "admin" || r === "1"));
 
-  // 🔁 Add handler that supports optional image
-  const handleAddRadiator = async (radiatorData, selectedImage) => {
-    try {
-      let result;
-
-      if (selectedImage) {
-        // Use direct service call for multipart create-with-image
-        result = await radiatorService.createWithImage(
-          radiatorData,
-          selectedImage
-        );
-      } else {
-        // Use existing hook JSON create
-        result = await createRadiator(radiatorData);
-      }
-
-      if (result?.success) {
-        addModal.closeModal();
-        if (refetch) await refetch();
-        return true;
-      } else {
-        throw new Error(result?.error || "Failed to create radiator");
-      }
-    } catch (e) {
-      console.error("Error adding radiator:", e);
-      alert("Failed to add radiator: " + (e.message || "Unknown error"));
-      return false;
+  const handleAddRadiator = async (radiatorData, imageFile) => {
+    const result = await createRadiator(radiatorData, imageFile);
+    
+    if (result.success) {
+      addModal.closeModal();
+      return true;
     }
+    return false;
   };
 
-  const handleEditRadiator = async (radiatorData, selectedImage) => {
-    try {
-      console.log("🔄 Updating radiator:", radiatorData);
-      console.log("🖼️ Selected image:", selectedImage?.name || "none");
-
-      // Step 1: Update radiator data (without image)
-      const updateResult = await updateRadiator(
-        editModal.data.id,
-        radiatorData
-      );
-      if (!updateResult.success) {
-        throw new Error(updateResult.error || "Failed to update radiator");
-      }
-
-      // Step 2: Handle image if provided
-      if (selectedImage) {
-        console.log("📤 Uploading new image...");
-        const imageResult = await radiatorService.uploadImage(
-          editModal.data.id,
-          selectedImage,
-          true // Set as primary image
-        );
-
-        if (!imageResult.success) {
-          console.warn(
-            "⚠️ Radiator updated but image upload failed:",
-            imageResult.error
-          );
-          alert(
-            "Radiator updated successfully, but image upload failed: " +
-              imageResult.error
-          );
-        } else {
-          console.log("✅ Image uploaded successfully");
-        }
-      }
-
+  const handleEditRadiator = async (radiatorData) => {
+    const result = await updateRadiator(editModal.data.id, radiatorData);
+    if (result.success) {
       editModal.closeModal();
-      if (refetch) await refetch();
       return true;
-    } catch (e) {
-      console.error("Error updating radiator:", e);
-      alert("Failed to update radiator: " + (e.message || "Unknown error"));
-      return false;
     }
+    return false;
   };
 
   const handleDeleteRadiator = async (radiator) => {
-    const confirmMessage = `Are you sure you want to delete "${radiator.name}"?\n\nThis will also remove all stock levels for this product across all warehouses.\n\nThis action cannot be undone.`;
-    if (!window.confirm(confirmMessage)) return;
-
-    try {
-      const result = await deleteRadiator(radiator.id);
-      if (!result.success) {
-        throw new Error(result.error || "Failed to delete radiator");
-      }
-      if (refetch) {
-        await refetch();
-      } else {
-        window.location.reload();
-      }
-    } catch (error) {
-      console.error("Error deleting radiator:", error);
-      alert("Failed to delete radiator: " + error.message);
+    if (
+      !window.confirm(
+        `Are you sure you want to delete ${radiator.name}? This action cannot be undone.`
+      )
+    ) {
+      return;
     }
-  };
 
-  const handleStockUpdate = async () => {
-    if (refetch) {
-      await refetch();
-    } else {
-      window.location.reload();
+    const result = await deleteRadiator(radiator.id);
+    if (!result.success) {
+      alert("Failed to delete radiator: " + result.error);
     }
   };
 
@@ -184,18 +144,26 @@ const RadiatorList = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div className="flex justify-between items-center">
         <div>
-          <h3 className="text-xl font-semibold text-gray-900">
-            Product Catalog
-          </h3>
-          <p className="text-sm text-gray-600">
-            Manage your radiator inventory
+          <h1 className="text-2xl font-bold text-gray-900">Inventory Management</h1>
+          <p className="text-sm text-gray-600 mt-1">
+            Manage your radiator products and stock levels
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
-          {/* view toggle */}
+        <div className="flex gap-2 items-center">
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value)}
+            className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-sm"
+          >
+            <option value="newest">Newest First</option>
+            <option value="oldest">Oldest First</option>
+            <option value="name">Name (A-Z)</option>
+            <option value="brand">Brand (A-Z)</option>
+          </select>
+
           <Button
             variant={viewMode === "list" ? "default" : "outline"}
             size="sm"
@@ -213,7 +181,6 @@ const RadiatorList = () => {
             Card
           </Button>
 
-          {/* add button for admin */}
           {isAdmin && (
             <Button onClick={() => addModal.openModal()} icon={Plus}>
               Add Radiator
@@ -238,7 +205,7 @@ const RadiatorList = () => {
         </div>
       )}
 
-      {filteredRadiators.length === 0 ? (
+      {sortedRadiators.length === 0 ? (
         <EmptyState
           icon={Package}
           title={hasActiveFilters ? "No radiators found" : "No radiators yet"}
@@ -251,25 +218,28 @@ const RadiatorList = () => {
           actionLabel="Clear filters"
           onAction={clearFilters}
         />
-      ) : viewMode === "list" ? (
-        <RadiatorTable
-          radiators={filteredRadiators}
-          onEdit={editModal.openModal}
-          onDelete={handleDeleteRadiator}
-          onEditStock={stockModal.openModal}
-          isAdmin={isAdmin}
-        />
       ) : (
-        <RadiatorCards
-          radiators={filteredRadiators}
-          onEdit={editModal.openModal}
-          onDelete={handleDeleteRadiator}
-          onEditStock={stockModal.openModal}
-          isAdmin={isAdmin}
-        />
+        <>
+          {viewMode === "list" ? (
+            <RadiatorTable
+              radiators={sortedRadiators}
+              onEdit={editModal.openModal}
+              onDelete={handleDeleteRadiator}
+              onEditStock={stockModal.openModal}
+              isAdmin={isAdmin}
+            />
+          ) : (
+            <RadiatorCards
+              radiators={sortedRadiators}
+              onEdit={editModal.openModal}
+              onDelete={handleDeleteRadiator}
+              onEditStock={stockModal.openModal}
+              isAdmin={isAdmin}
+            />
+          )}
+        </>
       )}
 
-      {/* Modals */}
       <AddRadiatorModal
         isOpen={addModal.isOpen}
         onClose={addModal.closeModal}

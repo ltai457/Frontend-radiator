@@ -13,8 +13,8 @@ export const useRadiators = () => {
     setError('');
     
     try {
-      // Back to the original working method
-      const result = await radiatorService.getAll();
+      // Fetch radiators sorted by createdAt ascending (earliest first)
+      const result = await radiatorService.getAll('createdAt', 'asc');
       if (result.success) {
         setRadiators(result.data);
       } else {
@@ -27,19 +27,13 @@ export const useRadiators = () => {
     }
   }, []);
 
-  // UPDATED: Create radiator (with optional image support)
+  // Simplified: Create radiator (with optional image)
   const createRadiator = async (radiatorData, imageFile = null) => {
     try {
-      let result;
+      console.log('🖼️ Creating radiator, image:', imageFile ? 'yes' : 'no');
       
-      // Use createWithImage if image is provided, otherwise use regular create
-      if (imageFile) {
-        console.log('🖼️ Creating radiator with image...');
-        result = await radiatorService.createWithImage(radiatorData, imageFile);
-      } else {
-        console.log('📝 Creating radiator without image...');
-        result = await radiatorService.create(radiatorData);
-      }
+      // Always use the same method - image is optional
+      const result = await radiatorService.create(radiatorData, imageFile);
       
       if (result.success) {
         setRadiators(prev => [result.data, ...prev]);
@@ -99,7 +93,7 @@ export const useRadiators = () => {
     }
   };
 
-  // NEW: Image-related functions
+  // Image-related functions
   const getRadiatorImages = async (radiatorId) => {
     try {
       const result = await radiatorService.getRadiatorImages(radiatorId);
@@ -131,12 +125,11 @@ export const useRadiators = () => {
     loading,
     error,
     fetchRadiators,
-    refetch: fetchRadiators, // alias for consistency
+    refetch: fetchRadiators,
     createRadiator,
     updateRadiator,
     deleteRadiator,
     updateStock,
-    // NEW: Image functions
     getRadiatorImages,
     uploadRadiatorImage
   };
