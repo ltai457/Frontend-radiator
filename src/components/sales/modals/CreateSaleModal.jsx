@@ -1,15 +1,17 @@
 // src/components/sales/modals/CreateSaleModal.jsx
+// REPLACE YOUR ENTIRE FILE WITH THIS
 import React, { useState, useEffect, useMemo } from "react";
 import { X, Plus, Search, Trash2, DollarSign, Package } from "lucide-react";
 import { Modal } from "../../common/ui/Modal";
 import { Button } from "../../common/ui/Button";
 import { LoadingSpinner } from "../../common/ui/LoadingSpinner";
 import customerService from "../../../api/customerService";
-import radiatorService from "../../../api/radiatorService";
 import stockService from "../../../api/stockService";
 import warehouseService from "../../../api/warehouseService";
-import { PAYMENT_METHODS } from "../../../utils/constants";
 import { formatCurrency } from "../../../utils/formatters";
+
+// Payment methods
+const PAYMENT_METHODS = ["Cash", "Card", "Bank Transfer", "EFTPOS"];
 
 const CreateSaleModal = ({ isOpen, onClose, onSubmit }) => {
   // Form data state
@@ -51,85 +53,51 @@ const CreateSaleModal = ({ isOpen, onClose, onSubmit }) => {
         await Promise.all([
           customerService.getAll(),
           stockService.getAllRadiatorsWithStock(),
-          warehouseService.getAll(), // Added this!
+          warehouseService.getAll(),
         ]);
 
-      console.log("📊 Customers result:", customersResult);
-      console.log("📊 Radiators result:", radiatorsResult);
-      console.log("📊 Warehouses result:", warehousesResult);
-
       if (customersResult.success) {
-        console.log("✅ Setting customers:", customersResult.data.length);
-        setCustomers(customersResult.data.filter((c) => c.isActive));
+        setCustomers(customersResult.data || []);
       }
-
       if (radiatorsResult.success) {
-        console.log("✅ Setting radiators:", radiatorsResult.data.length);
-        setRadiators(radiatorsResult.data);
+        setRadiators(radiatorsResult.data || []);
+      }
+      if (warehousesResult.success) {
+        setWarehouses(warehousesResult.data || []);
       }
 
-      if (warehousesResult.success) {
-        console.log("✅ Setting warehouses:", warehousesResult.data.length);
-        setWarehouses(warehousesResult.data);
-      } else {
-        console.error("❌ Failed to load warehouses:", warehousesResult.error);
-        setError("Failed to load warehouses: " + warehousesResult.error);
-      }
-    } catch (err) {
-      console.error("❌ Error in loadFormData:", err);
-      setError("Failed to load form data");
+      console.log("✅ Form data loaded successfully");
+    } catch (error) {
+      console.error("❌ Error loading form data:", error);
+      setError("Failed to load form data. Please try again.");
     } finally {
       setLoadingData(false);
     }
   };
 
-  // Reset form when modal opens/closes
-  useEffect(() => {
-    if (!isOpen) {
-      setFormData({
-        customerId: "",
-        items: [],
-        paymentMethod: "Cash",
-        notes: "",
-      });
-      setCustomerSearch("");
-      setProductSearch("");
-      setSelectedCustomer(null);
-      setError("");
-    }
-  }, [isOpen]);
-
-  // Filtered customers for search
+  // Filter customers based on search
   const filteredCustomers = useMemo(() => {
-    if (!customerSearch.trim()) return customers.slice(0, 10);
-
-    return customers
-      .filter((customer) => {
-        const searchTerm = customerSearch.toLowerCase();
-        return (
-          customer.firstName?.toLowerCase().includes(searchTerm) ||
-          customer.lastName?.toLowerCase().includes(searchTerm) ||
-          customer.company?.toLowerCase().includes(searchTerm) ||
-          customer.email?.toLowerCase().includes(searchTerm)
-        );
-      })
-      .slice(0, 10);
+    if (!customerSearch) return customers;
+    const searchLower = customerSearch.toLowerCase();
+    return customers.filter(
+      (customer) =>
+        customer.firstName?.toLowerCase().includes(searchLower) ||
+        customer.lastName?.toLowerCase().includes(searchLower) ||
+        customer.email?.toLowerCase().includes(searchLower) ||
+        customer.company?.toLowerCase().includes(searchLower)
+    );
   }, [customers, customerSearch]);
 
-  // Filtered radiators for search
-  const filteredRadiators = useMemo(() => {
-    if (!productSearch.trim()) return radiators.slice(0, 10);
-
-    return radiators
-      .filter((radiator) => {
-        const searchTerm = productSearch.toLowerCase();
-        return (
-          radiator.name?.toLowerCase().includes(searchTerm) ||
-          radiator.code?.toLowerCase().includes(searchTerm) ||
-          radiator.brand?.toLowerCase().includes(searchTerm)
-        );
-      })
-      .slice(0, 10);
+  // Filter products based on search
+  const filteredProducts = useMemo(() => {
+    if (!productSearch) return radiators;
+    const searchLower = productSearch.toLowerCase();
+    return radiators.filter(
+      (radiator) =>
+        radiator.name?.toLowerCase().includes(searchLower) ||
+        radiator.code?.toLowerCase().includes(searchLower) ||
+        radiator.brand?.toLowerCase().includes(searchLower)
+    );
   }, [radiators, productSearch]);
 
   // Handle customer selection
@@ -137,8 +105,8 @@ const CreateSaleModal = ({ isOpen, onClose, onSubmit }) => {
     setSelectedCustomer(customer);
     setFormData((prev) => ({ ...prev, customerId: customer.id }));
     setCustomerSearch(
-      `${customer.firstName} ${customer.lastName} ${
-        customer.company ? `- ${customer.company}` : ""
+      `${customer.firstName} ${customer.lastName}${
+        customer.company ? ` - ${customer.company}` : ""
       }`
     );
     setShowCustomerDropdown(false);
@@ -171,7 +139,6 @@ const CreateSaleModal = ({ isOpen, onClose, onSubmit }) => {
         quantity: 1,
         unitPrice: radiator.retailPrice || 0,
         totalPrice: radiator.retailPrice || 0,
-        // NEW:
         warehouseId: chosen?.id || "",
         warehouseCode: chosen?.code || "",
         availableStock: available,
@@ -183,6 +150,8 @@ const CreateSaleModal = ({ isOpen, onClose, onSubmit }) => {
     setProductSearch("");
     setShowProductDropdown(false);
   };
+
+  // Handle warehouse change for an item
   const handleItemWarehouseChange = (index, warehouseId) => {
     const w = warehouses.find((x) => String(x.id) === String(warehouseId));
     const updatedItems = [...formData.items];
@@ -191,13 +160,11 @@ const CreateSaleModal = ({ isOpen, onClose, onSubmit }) => {
     const newWarehouseCode = w?.code || "";
     const newAvailable = newWarehouseCode
       ? getWarehouseStock(
-          // find this radiator in the full list to read its stock map
           radiators.find((r) => r.id === item.radiatorId)?.stock,
           newWarehouseCode
         )
       : 0;
 
-    // clamp quantity to available in the newly selected warehouse
     const clampedQty = Math.max(1, Math.min(item.quantity, newAvailable));
 
     updatedItems[index] = {
@@ -210,12 +177,6 @@ const CreateSaleModal = ({ isOpen, onClose, onSubmit }) => {
     };
 
     setFormData((prev) => ({ ...prev, items: updatedItems }));
-  };
-
-  // Get total stock across all warehouses
-  const getTotalStock = (stock) => {
-    if (!stock) return 0;
-    return Object.values(stock).reduce((total, qty) => total + (qty || 0), 0);
   };
 
   // Handle item quantity change
@@ -272,7 +233,6 @@ const CreateSaleModal = ({ isOpen, onClose, onSubmit }) => {
     return Number(stockObj[warehouseCode] || 0);
   };
 
-  // Pick a default warehouse that actually has stock for this radiator
   const getDefaultWarehouseForRadiator = (stockObj, warehouses) => {
     if (!stockObj || !warehouses?.length) return null;
     const w = warehouses.find((w) => getWarehouseStock(stockObj, w.code) > 0);
@@ -298,54 +258,64 @@ const CreateSaleModal = ({ isOpen, onClose, onSubmit }) => {
         );
         return false;
       }
+      if (!item.warehouseId) {
+        setError(`Please select a warehouse for ${item.radiatorName}`);
+        return false;
+      }
     }
 
     return true;
   };
 
   // Handle form submission
-  const handleSubmit = async () => {
+  const handleSubmit = async (e) => {
+    e.preventDefault();
     setError("");
+
     if (!validateForm()) return;
 
     setLoading(true);
-    try {
-      // Transform data to match backend DTO
-      const transformedData = {
-        customerId: formData.customerId,
-        paymentMethod: formData.paymentMethod,
-        notes: formData.notes,
-        items: formData.items.map((item) => ({
-          radiatorId: item.radiatorId,
-          warehouseId: item.warehouseId,
-          quantity: item.quantity,
-          unitPrice: item.unitPrice,
-        })),
-      };
 
-      console.log("📤 Sending sale data:", transformedData);
+    const saleData = {
+      customerId: formData.customerId,
+      paymentMethod: formData.paymentMethod,
+      notes: formData.notes,
+      items: formData.items.map((item) => ({
+        radiatorId: item.radiatorId,
+        warehouseId: item.warehouseId,
+        quantity: item.quantity,
+        unitPrice: item.unitPrice,
+      })),
+    };
 
-      const success = await onSubmit(transformedData);
-      if (success) {
-        onClose();
-      }
-    } catch (err) {
-      console.error("❌ Error creating sale:", err);
-      setError(err.message || "Failed to create sale");
-    } finally {
-      setLoading(false);
+    const success = await onSubmit(saleData);
+
+    if (success) {
+      handleClose();
     }
+
+    setLoading(false);
+  };
+
+  // Reset and close modal
+  const handleClose = () => {
+    setFormData({
+      customerId: "",
+      items: [],
+      paymentMethod: "Cash",
+      notes: "",
+    });
+    setCustomerSearch("");
+    setProductSearch("");
+    setSelectedCustomer(null);
+    setError("");
+    onClose();
   };
 
   if (loadingData) {
     return (
-      <Modal
-        isOpen={isOpen}
-        onClose={onClose}
-        title="Create New Sale"
-        size="xl"
-      >
-        <div className="p-8 text-center">
+      <Modal isOpen={isOpen} onClose={handleClose} title="Create New Sale">
+        <div className="flex justify-center items-center py-12">
           <LoadingSpinner size="lg" text="Loading form data..." />
         </div>
       </Modal>
@@ -353,129 +323,109 @@ const CreateSaleModal = ({ isOpen, onClose, onSubmit }) => {
   }
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Create New Sale" size="xl">
-      <div className="p-6 space-y-6 max-h-[80vh] overflow-y-auto">
+    <Modal isOpen={isOpen} onClose={handleClose} title="Create New Sale" maxWidth="4xl">
+      <form onSubmit={handleSubmit} className="space-y-6">
+        {/* Error Display */}
         {error && (
-          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
+          <div className="bg-red-50 border border-red-200 text-red-800 px-4 py-3 rounded-lg">
             {error}
           </div>
         )}
 
         {/* Customer Selection */}
-        <div className="relative">
+        <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Customer *
           </label>
           <div className="relative">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <Search className="h-4 w-4 text-gray-400" />
-            </div>
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
             <input
               type="text"
-              placeholder="Search customers by name, company, or email..."
               value={customerSearch}
               onChange={(e) => {
                 setCustomerSearch(e.target.value);
                 setShowCustomerDropdown(true);
               }}
               onFocus={() => setShowCustomerDropdown(true)}
+              placeholder="Search customer by name, email, or company..."
               className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               disabled={loading}
             />
-          </div>
 
-          {showCustomerDropdown && (
-            <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
-              {filteredCustomers.length === 0 ? (
-                <div className="px-4 py-3 text-sm text-gray-500">
-                  {customerSearch
-                    ? "No customers found"
-                    : "Start typing to search customers"}
-                </div>
-              ) : (
-                filteredCustomers.map((customer) => (
+            {/* Customer Dropdown */}
+            {showCustomerDropdown && filteredCustomers.length > 0 && (
+              <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                {filteredCustomers.map((customer) => (
                   <button
                     key={customer.id}
                     type="button"
                     onClick={() => handleSelectCustomer(customer)}
-                    className="w-full px-4 py-3 text-left hover:bg-gray-50 focus:bg-gray-50 focus:outline-none border-b border-gray-100 last:border-0"
+                    className="w-full text-left px-4 py-2 hover:bg-gray-50 focus:bg-gray-100 focus:outline-none"
                   >
                     <div className="font-medium text-gray-900">
                       {customer.firstName} {customer.lastName}
                     </div>
-                    <div className="text-sm text-gray-500">
-                      {customer.company && `${customer.company} • `}
-                      {customer.email}
-                    </div>
+                    {customer.company && (
+                      <div className="text-sm text-gray-500">{customer.company}</div>
+                    )}
+                    {customer.email && (
+                      <div className="text-xs text-gray-400">{customer.email}</div>
+                    )}
                   </button>
-                ))
-              )}
-            </div>
-          )}
+                ))}
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Product Search */}
-        <div className="relative">
+        <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
             Add Products
           </label>
           <div className="relative">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <Search className="h-4 w-4 text-gray-400" />
-            </div>
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
             <input
               type="text"
-              placeholder="Search radiators by name, code, or brand..."
               value={productSearch}
               onChange={(e) => {
                 setProductSearch(e.target.value);
                 setShowProductDropdown(true);
               }}
               onFocus={() => setShowProductDropdown(true)}
+              placeholder="Search products by name, code, or brand..."
               className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               disabled={loading}
             />
-          </div>
 
-          {showProductDropdown && (
-            <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
-              {filteredRadiators.length === 0 ? (
-                <div className="px-4 py-3 text-sm text-gray-500">
-                  {productSearch
-                    ? "No products found"
-                    : "Start typing to search products"}
-                </div>
-              ) : (
-                filteredRadiators.map((radiator) => {
-                  const totalStock = getTotalStock(radiator.stock);
+            {/* Product Dropdown */}
+            {showProductDropdown && filteredProducts.length > 0 && (
+              <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                {filteredProducts.map((radiator) => {
+                  const totalStock = radiator.totalStock || 0;
                   return (
                     <button
                       key={radiator.id}
                       type="button"
                       onClick={() => handleAddProduct(radiator)}
+                      className="w-full text-left px-4 py-2 hover:bg-gray-50 focus:bg-gray-100 focus:outline-none"
                       disabled={totalStock === 0}
-                      className={`w-full px-4 py-3 text-left hover:bg-gray-50 focus:bg-gray-50 focus:outline-none border-b border-gray-100 last:border-0 ${
-                        totalStock === 0 ? "opacity-50 cursor-not-allowed" : ""
-                      }`}
                     >
                       <div className="flex justify-between items-start">
-                        <div>
+                        <div className="flex-1">
                           <div className="font-medium text-gray-900">
                             {radiator.name}
                           </div>
                           <div className="text-sm text-gray-500">
                             {radiator.brand} - {radiator.code}
                           </div>
-                          <div className="text-sm text-blue-600">
-                            $
-                            {radiator.retailPrice
-                              ? radiator.retailPrice.toFixed(2)
-                              : "0.00"}
-                          </div>
                         </div>
-                        <div className="text-right">
+                        <div className="text-right ml-4">
+                          <div className="text-sm font-medium text-gray-900">
+                            {formatCurrency(radiator.retailPrice)}
+                          </div>
                           <div
-                            className={`text-sm font-medium ${
+                            className={`text-xs ${
                               totalStock === 0
                                 ? "text-red-600"
                                 : totalStock <= 5
@@ -483,144 +433,65 @@ const CreateSaleModal = ({ isOpen, onClose, onSubmit }) => {
                                 : "text-green-600"
                             }`}
                           >
-                            Stock: {totalStock}
+                            {totalStock} in stock
                           </div>
-                          {totalStock === 0 && (
-                            <div className="text-xs text-red-500">
-                              Out of Stock
-                            </div>
-                          )}
                         </div>
                       </div>
                     </button>
                   );
-                })
-              )}
-            </div>
-          )}
+                })}
+              </div>
+            )}
+          </div>
         </div>
 
-        {/* Selected Items */}
-        <div>
-          <h4 className="text-sm font-medium text-gray-700 mb-3">Sale Items</h4>
-
-          {formData.items.length === 0 ? (
-            <div className="text-center py-8 text-gray-500 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
-              <Package className="w-8 h-8 mx-auto mb-2 text-gray-400" />
-              <p>No items added yet</p>
-              <p className="text-sm">
-                Search for products above to add them to the sale
-              </p>
-            </div>
-          ) : (
+        {/* Items List - IMPROVED VERSION */}
+        {formData.items.length > 0 && (
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-3">
+              Sale Items ({formData.items.length})
+            </label>
             <div className="space-y-3">
               {formData.items.map((item, index) => (
-                <div key={index} className="bg-gray-50 p-4 rounded-lg">
-                  <div className="flex items-center justify-between">
+                <div
+                  key={index}
+                  className="border border-gray-200 rounded-lg p-4 bg-gray-50"
+                >
+                  {/* Product Info Header */}
+                  <div className="flex items-start justify-between mb-3">
                     <div className="flex-1">
-                      <div className="font-medium text-gray-900">
+                      <h4 className="font-medium text-gray-900">
                         {item.radiatorName}
-                      </div>
-                      <div className="text-sm text-gray-500">
+                      </h4>
+                      <p className="text-sm text-gray-500">
                         {item.brand} - {item.radiatorCode}
-                      </div>
+                      </p>
                     </div>
-
-                    <div className="flex items-center space-x-3">
-                      {/* Quantity — blank by default */}
-                      <div className="flex items-center space-x-2">
-                        <label className="text-sm text-gray-600">Qty:</label>
-                        <input
-                          type="number"
-                          value={item.quantity ?? ""}
-                          placeholder="Qty"
-                          onChange={(e) => {
-                            const value =
-                              e.target.value === ""
-                                ? ""
-                                : parseInt(e.target.value, 10);
-                            const updated = [...formData.items];
-                            updated[index] = {
-                              ...item,
-                              quantity: value,
-                              totalPrice:
-                                value && item.unitPrice
-                                  ? value * item.unitPrice
-                                  : 0,
-                            };
-                            setFormData((prev) => ({
-                              ...prev,
-                              items: updated,
-                            }));
-                          }}
-                          className="w-16 px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                          disabled={loading}
-                        />
-                      </div>
-
-                      {/* Price */}
-                      <div className="flex items-center space-x-2">
-                        <DollarSign className="w-4 h-4 text-gray-400" />
-                        <input
-                          type="number"
-                          value={item.unitPrice ?? ""}
-                          placeholder="Price"
-                          onChange={(e) => {
-                            const value =
-                              e.target.value === ""
-                                ? ""
-                                : parseFloat(e.target.value);
-                            const updated = [...formData.items];
-                            updated[index] = {
-                              ...item,
-                              unitPrice: value,
-                              totalPrice:
-                                item.quantity && value
-                                  ? item.quantity * value
-                                  : 0,
-                            };
-                            setFormData((prev) => ({
-                              ...prev,
-                              items: updated,
-                            }));
-                          }}
-                          className="w-20 px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                          disabled={loading}
-                        />
-                      </div>
-
-                      {/* Total */}
-                      <div className="text-sm font-medium text-gray-900 min-w-[60px]">
-                        {item.totalPrice
-                          ? `$${item.totalPrice.toFixed(2)}`
-                          : ""}
-                      </div>
-
-                      {/* Remove */}
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveItem(index)}
-                        className="text-red-600 hover:text-red-800 p-1"
-                        disabled={loading}
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveItem(index)}
+                      className="text-red-600 hover:text-red-800 p-1 rounded hover:bg-red-50"
+                      disabled={loading}
+                    >
+                      <Trash2 className="w-5 h-5" />
+                    </button>
                   </div>
 
-                  {/* Warehouse selector */}
-                  <div className="mt-3 flex items-center space-x-2">
-                    <label className="text-sm text-gray-600">Warehouse:</label>
+                  {/* Warehouse Selector - PROMINENT */}
+                  <div className="mb-3 bg-white border border-blue-200 rounded-lg p-3">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      📦 Select Warehouse
+                    </label>
                     <select
                       value={item.warehouseId || ""}
                       onChange={(e) =>
                         handleItemWarehouseChange(index, e.target.value)
                       }
-                      className="px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
                       disabled={loading || warehouses.length === 0}
                     >
                       <option value="" disabled>
-                        Select warehouse
+                        Choose warehouse location...
                       </option>
                       {warehouses.map((w) => {
                         const stockForW = getWarehouseStock(
@@ -628,108 +499,196 @@ const CreateSaleModal = ({ isOpen, onClose, onSubmit }) => {
                             ?.stock,
                           w.code
                         );
+                        const isSelected =
+                          String(item.warehouseId) === String(w.id);
                         return (
                           <option
                             key={w.id}
                             value={w.id}
                             disabled={stockForW === 0}
                           >
-                            {w.name || w.code}{" "}
+                            {w.name || w.code} -{" "}
                             {stockForW > 0
-                              ? `• ${stockForW} in stock`
-                              : "• Out"}
+                              ? `${stockForW} in stock`
+                              : "Out of stock"}
+                            {isSelected ? " ✓" : ""}
                           </option>
                         );
                       })}
                     </select>
+
+                    {/* Stock Warning */}
+                    {item.availableStock === 0 && (
+                      <p className="mt-2 text-xs text-red-600 flex items-center gap-1">
+                        <span>⚠️</span>
+                        <span>Out of stock at selected warehouse</span>
+                      </p>
+                    )}
+                    {item.availableStock > 0 && item.availableStock <= 5 && (
+                      <p className="mt-2 text-xs text-yellow-600 flex items-center gap-1">
+                        <span>⚠️</span>
+                        <span>
+                          Low stock: Only {item.availableStock} available
+                        </span>
+                      </p>
+                    )}
+                    {item.availableStock > 5 && (
+                      <p className="mt-2 text-xs text-green-600 flex items-center gap-1">
+                        <span>✓</span>
+                        <span>{item.availableStock} units available</span>
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Quantity and Price Controls */}
+                  <div className="grid grid-cols-3 gap-3">
+                    {/* Quantity */}
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">
+                        Quantity
+                      </label>
+                      <input
+                        type="number"
+                        min="1"
+                        max={item.availableStock}
+                        value={item.quantity}
+                        onChange={(e) =>
+                          handleItemQuantityChange(
+                            index,
+                            parseInt(e.target.value)
+                          )
+                        }
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        disabled={loading || item.availableStock === 0}
+                      />
+                      <p className="mt-1 text-xs text-gray-500">
+                        Max: {item.availableStock}
+                      </p>
+                    </div>
+
+                    {/* Unit Price */}
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">
+                        Unit Price
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={item.unitPrice}
+                        onChange={(e) =>
+                          handleItemPriceChange(
+                            index,
+                            parseFloat(e.target.value)
+                          )
+                        }
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        disabled={loading}
+                      />
+                    </div>
+
+                    {/* Total Price */}
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">
+                        Total
+                      </label>
+                      <div className="px-3 py-2 bg-gray-100 border border-gray-300 rounded-lg font-medium text-gray-900 flex items-center h-[42px]">
+                        {formatCurrency(item.totalPrice)}
+                      </div>
+                    </div>
                   </div>
                 </div>
               ))}
             </div>
-          )}
+          </div>
+        )}
+
+        {/* Payment and Notes */}
+        <div className="grid grid-cols-2 gap-4">
+          {/* Payment Method */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Payment Method *
+            </label>
+            <select
+              value={formData.paymentMethod}
+              onChange={(e) =>
+                setFormData((prev) => ({
+                  ...prev,
+                  paymentMethod: e.target.value,
+                }))
+              }
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              disabled={loading}
+            >
+              {PAYMENT_METHODS.map((method) => (
+                <option key={method} value={method}>
+                  {method}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Notes */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Notes (Optional)
+            </label>
+            <input
+              type="text"
+              value={formData.notes}
+              onChange={(e) =>
+                setFormData((prev) => ({ ...prev, notes: e.target.value }))
+              }
+              placeholder="Add any notes..."
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              disabled={loading}
+            />
+          </div>
         </div>
 
-        {/* Payment Method */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Payment Method *
-          </label>
-          <select
-            value={formData.paymentMethod}
-            onChange={(e) =>
-              setFormData((prev) => ({
-                ...prev,
-                paymentMethod: e.target.value,
-              }))
-            }
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            disabled={loading}
-          >
-            {Object.entries(PAYMENT_METHODS).map(([key, value]) => (
-              <option key={key} value={value}>
-                {value}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        {/* Notes */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Notes
-          </label>
-          <textarea
-            value={formData.notes}
-            onChange={(e) =>
-              setFormData((prev) => ({ ...prev, notes: e.target.value }))
-            }
-            rows={3}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            placeholder="Optional notes about this sale..."
-            disabled={loading}
-          />
-        </div>
-
-        {/* Sale Summary */}
+        {/* Order Summary */}
         {formData.items.length > 0 && (
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-            <h4 className="font-medium text-gray-900 mb-3">Sale Summary</h4>
-            <div className="space-y-2 text-sm">
-              <div className="flex justify-between">
-                <span>Subtotal:</span>
-                <span>${calculateSubtotal().toFixed(2)}</span>
+          <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+            <h3 className="font-medium text-gray-900 mb-3">Order Summary</h3>
+            <div className="space-y-2">
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-600">Subtotal:</span>
+                <span className="font-medium">
+                  {formatCurrency(calculateSubtotal())}
+                </span>
               </div>
-              <div className="flex justify-between">
-                <span>GST (15%):</span>
-                <span>${calculateTax().toFixed(2)}</span>
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-600">GST (15%):</span>
+                <span className="font-medium">
+                  {formatCurrency(calculateTax())}
+                </span>
               </div>
-              <div className="flex justify-between font-bold text-lg border-t border-blue-300 pt-2 mt-3">
+              <div className="flex justify-between text-lg font-bold border-t pt-2">
                 <span>Total:</span>
-                <span>${calculateTotal().toFixed(2)}</span>
+                <span className="text-blue-600">
+                  {formatCurrency(calculateTotal())}
+                </span>
               </div>
             </div>
           </div>
         )}
 
-        {/* Form Actions */}
+        {/* Action Buttons */}
         <div className="flex justify-end gap-3 pt-4 border-t">
           <Button
             type="button"
-            variant="secondary"
-            onClick={onClose}
+            variant="outline"
+            onClick={handleClose}
             disabled={loading}
           >
             Cancel
           </Button>
-          <Button
-            onClick={handleSubmit}
-            loading={loading}
-            disabled={formData.items.length === 0 || !formData.customerId}
-          >
-            Create Sale (${calculateTotal().toFixed(2)})
+          <Button type="submit" disabled={loading || formData.items.length === 0}>
+            {loading ? "Creating Sale..." : `Create Sale (${formatCurrency(calculateTotal())})`}
           </Button>
         </div>
-      </div>
+      </form>
 
       {/* Click outside handlers */}
       {showCustomerDropdown && (
