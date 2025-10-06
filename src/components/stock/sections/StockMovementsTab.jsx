@@ -1,15 +1,8 @@
-// ============================================
-// FILE: src/components/stock/sections/StockMovementsTab.jsx
-// Simplified - tracks ALL sales automatically, no status needed
-// ============================================
-
+// src/components/stock/sections/StockMovementsTab.jsx
 import React, { useState, useEffect } from 'react';
-import { Package, Calendar, MapPin, TrendingDown, AlertCircle } from 'lucide-react';
+import { Package, Calendar, MapPin, TrendingDown, TrendingUp, AlertCircle, ArrowUp, ArrowDown } from 'lucide-react';
 import { LoadingSpinner } from '../../common/ui/LoadingSpinner';
-import salesService from '../../../api/salesService';
-import warehouseService from '../../../api/warehouseService';
-import radiatorService from '../../../api/radiatorService';
-import { formatCurrency } from '../../../utils/formatters';
+import stockService from '../../../api/stockService';
 
 const StockMovementsTab = () => {
   const [movements, setMovements] = useState([]);
@@ -17,37 +10,11 @@ const StockMovementsTab = () => {
   const [dateRange, setDateRange] = useState('30');
   const [warehouseFilter, setWarehouseFilter] = useState('all');
   const [productFilter, setProductFilter] = useState('');
-  const [warehouses, setWarehouses] = useState([]);
-  const [radiators, setRadiators] = useState([]);
+  const [movementTypeFilter, setMovementTypeFilter] = useState('all');
 
   useEffect(() => {
-    loadReferenceData();
-  }, []);
-
-  useEffect(() => {
-    if (warehouses.length > 0 && radiators.length > 0) {
-      loadMovements();
-    }
-  }, [dateRange, warehouses, radiators]);
-
-  // Load warehouses and radiators for reference
-  const loadReferenceData = async () => {
-    try {
-      const [warehousesResult, radiatorsResult] = await Promise.all([
-        warehouseService.getAll(),
-        radiatorService.getAll()
-      ]);
-
-      if (warehousesResult.success) {
-        setWarehouses(warehousesResult.data);
-      }
-      if (radiatorsResult.success) {
-        setRadiators(radiatorsResult.data);
-      }
-    } catch (error) {
-      console.error('Error loading reference data:', error);
-    }
-  };
+    loadMovements();
+  }, [dateRange, warehouseFilter, movementTypeFilter]);
 
   const loadMovements = async () => {
     setLoading(true);
@@ -56,80 +23,31 @@ const StockMovementsTab = () => {
       const fromDate = new Date();
       fromDate.setDate(fromDate.getDate() - parseInt(dateRange));
 
-      // Get list of sales first
-      let result = await salesService.getByDateRange(fromDate, toDate);
-      
-      if (!result.success || !result.data || result.data.length === 0) {
-        console.log('⚠️ Date range query failed or empty, trying getAll...');
-        result = await salesService.getAll();
+      const params = {
+        fromDate,
+        toDate,
+        limit: 500
+      };
+
+      if (warehouseFilter !== 'all') {
+        params.warehouseCode = warehouseFilter;
       }
+
+      if (movementTypeFilter !== 'all') {
+        params.movementType = movementTypeFilter;
+      }
+
+      const result = await stockService.getStockMovements(params);
       
-      console.log('📦 Sales list received:', result.data?.length, 'sales');
-      
-      if (result.success && result.data.length > 0) {
-        // Fetch full details for each sale to get items
-        console.log('🔄 Fetching full details for each sale...');
-        const salesWithDetails = await Promise.all(
-          result.data.map(async (sale) => {
-            try {
-              const detailResult = await salesService.getById(sale.id);
-              if (detailResult.success) {
-                return detailResult.data;
-              }
-            } catch (error) {
-              console.error('Failed to fetch sale details:', sale.id, error);
-            }
-            return null;
-          })
-        );
-
-        // Filter out failed fetches
-        const validSales = salesWithDetails.filter(sale => sale !== null);
-        console.log('📦 Full sales data loaded:', validSales.length);
-        
-        // Extract all items from ALL sales (ignore status completely)
-        const allMovements = [];
-        validSales.forEach(sale => {
-          const itemCount = sale.items?.length || 0;
-          console.log('Processing sale:', sale.saleNumber, 'Items:', itemCount);
-          
-          if (!sale.items || sale.items.length === 0) {
-            console.warn('⚠️ Sale has no items:', sale.saleNumber);
-            return;
-          }
-          
-          sale.items.forEach(item => {
-            console.log('Raw item data:', item);
-
-            allMovements.push({
-              id: `${sale.id}-${item.id || Math.random()}`,
-              date: sale.saleDate,
-              saleNumber: sale.saleNumber,
-              // Use nested objects directly - they're already populated!
-              productName: item.radiator?.name || 'Unknown Product',
-              productCode: item.radiator?.code || 'N/A',
-              brand: item.radiator?.brand || 'N/A',
-              quantity: item.quantity,
-              warehouseCode: item.warehouse?.code || 'Unknown',
-              warehouseName: item.warehouse?.name || 'Unknown',
-              customerName: sale.customerName || `${sale.customer?.firstName || ''} ${sale.customer?.lastName || ''}`.trim() || 'Walk-in',
-              unitPrice: item.unitPrice,
-              totalPrice: item.totalPrice || (item.quantity * item.unitPrice)
-            });
-          });
-        });
-
-        console.log('✅ Total movements found:', allMovements.length);
-
-        // Sort by date (newest first)
-        allMovements.sort((a, b) => new Date(b.date) - new Date(a.date));
-        setMovements(allMovements);
+      if (result.success) {
+        setMovements(result.data || []);
       } else {
-        console.warn('❌ No sales data available');
+        console.error('Failed to load movements:', result.error);
         setMovements([]);
       }
     } catch (error) {
       console.error('Error loading movements:', error);
+      setMovements([]);
     } finally {
       setLoading(false);
     }
@@ -140,13 +58,18 @@ const StockMovementsTab = () => {
 
   // Filter movements
   const filteredMovements = movements.filter(movement => {
-    const matchesWarehouse = warehouseFilter === 'all' || movement.warehouseCode === warehouseFilter;
     const matchesProduct = !productFilter || 
       movement.productName.toLowerCase().includes(productFilter.toLowerCase()) ||
       movement.productCode.toLowerCase().includes(productFilter.toLowerCase());
     
-    return matchesWarehouse && matchesProduct;
+    return matchesProduct;
   });
+
+  // Calculate statistics
+  const incomingCount = filteredMovements.filter(m => m.movementType === 'INCOMING').length;
+  const outgoingCount = filteredMovements.filter(m => m.movementType === 'OUTGOING').length;
+  const incomingQty = filteredMovements.filter(m => m.movementType === 'INCOMING').reduce((sum, m) => sum + m.quantity, 0);
+  const outgoingQty = filteredMovements.filter(m => m.movementType === 'OUTGOING').reduce((sum, m) => sum + m.quantity, 0);
 
   const formatDate = (dateString) => {
     const date = new Date(dateString);
@@ -164,7 +87,7 @@ const StockMovementsTab = () => {
         <div>
           <h2 className="text-xl font-bold text-gray-900">Stock Movements</h2>
           <p className="text-sm text-gray-600 mt-1">
-            Automatic log of products sold from each warehouse
+            Track all incoming and outgoing stock changes
           </p>
         </div>
 
@@ -177,6 +100,17 @@ const StockMovementsTab = () => {
             onChange={(e) => setProductFilter(e.target.value)}
             className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
           />
+
+          {/* Movement Type Filter */}
+          <select
+            value={movementTypeFilter}
+            onChange={(e) => setMovementTypeFilter(e.target.value)}
+            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+          >
+            <option value="all">All Types</option>
+            <option value="INCOMING">Incoming Only</option>
+            <option value="OUTGOING">Outgoing Only</option>
+          </select>
 
           {/* Warehouse Filter */}
           <select
@@ -211,8 +145,7 @@ const StockMovementsTab = () => {
           <div>
             <p className="font-medium text-blue-900">No stock movements yet</p>
             <p className="text-sm text-blue-700 mt-1">
-              Stock movements are tracked automatically when you create a sale. 
-              Create your first sale to see movements here!
+              Stock movements are tracked when you create sales or edit stock levels.
             </p>
           </div>
         </div>
@@ -220,7 +153,7 @@ const StockMovementsTab = () => {
 
       {/* Summary Cards */}
       {movements.length > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div className="bg-white rounded-lg shadow p-4 border border-gray-200">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
@@ -236,13 +169,25 @@ const StockMovementsTab = () => {
           <div className="bg-white rounded-lg shadow p-4 border border-gray-200">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
-                <Package className="w-5 h-5 text-green-600" />
+                <ArrowUp className="w-5 h-5 text-green-600" />
               </div>
               <div>
-                <p className="text-sm text-gray-600">Units Sold</p>
-                <p className="text-xl font-bold text-gray-900">
-                  {filteredMovements.reduce((sum, m) => sum + m.quantity, 0)}
-                </p>
+                <p className="text-sm text-gray-600">Incoming</p>
+                <p className="text-xl font-bold text-gray-900">{incomingQty} units</p>
+                <p className="text-xs text-gray-500">{incomingCount} movements</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-lg shadow p-4 border border-gray-200">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center">
+                <ArrowDown className="w-5 h-5 text-red-600" />
+              </div>
+              <div>
+                <p className="text-sm text-gray-600">Outgoing</p>
+                <p className="text-xl font-bold text-gray-900">{outgoingQty} units</p>
+                <p className="text-xs text-gray-500">{outgoingCount} movements</p>
               </div>
             </div>
           </div>
@@ -268,30 +213,19 @@ const StockMovementsTab = () => {
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                    Date & Time
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                    Product
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                    Warehouse
-                  </th>
-                  <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">
-                    Quantity
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                    Customer
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                    Sale #
-                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date & Time</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Product</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Warehouse</th>
+                  <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Type</th>
+                  <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Quantity</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Change Type</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Reference</th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {filteredMovements.length === 0 ? (
                   <tr>
-                    <td colSpan="6" className="px-6 py-12 text-center text-gray-500">
+                    <td colSpan="7" className="px-6 py-12 text-center text-gray-500">
                       No stock movements found for selected filters
                     </td>
                   </tr>
@@ -306,41 +240,53 @@ const StockMovementsTab = () => {
                       </td>
                       <td className="px-6 py-4">
                         <div>
-                          <div className="font-medium text-gray-900">
-                            {movement.productName}
-                          </div>
-                          <div className="text-sm text-gray-500">
-                            {movement.brand} - {movement.productCode}
-                          </div>
+                          <div className="font-medium text-gray-900">{movement.productName}</div>
+                          <div className="text-sm text-gray-500">{movement.brand} - {movement.productCode}</div>
                         </div>
                       </td>
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-2">
                           <MapPin className="w-4 h-4 text-blue-500" />
                           <div>
-                            <div className="font-medium text-gray-900">
-                              {movement.warehouseName}
-                            </div>
-                            <div className="text-xs text-gray-500">
-                              {movement.warehouseCode}
-                            </div>
+                            <div className="font-medium text-gray-900">{movement.warehouseName}</div>
+                            <div className="text-xs text-gray-500">{movement.warehouseCode}</div>
                           </div>
                         </div>
                       </td>
                       <td className="px-6 py-4 text-center">
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                          -{movement.quantity}
+                        {movement.movementType === 'INCOMING' ? (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                            <ArrowUp className="w-3 h-3" />
+                            Incoming
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                            <ArrowDown className="w-3 h-3" />
+                            Outgoing
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 text-center">
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                          movement.movementType === 'INCOMING' 
+                            ? 'bg-green-50 text-green-700' 
+                            : 'bg-red-50 text-red-700'
+                        }`}>
+                          {movement.movementType === 'INCOMING' ? '+' : '-'}{movement.quantity}
                         </span>
                       </td>
                       <td className="px-6 py-4">
-                        <div className="text-sm text-gray-900">
-                          {movement.customerName || 'N/A'}
-                        </div>
+                        <div className="text-sm text-gray-900">{movement.changeType}</div>
                       </td>
                       <td className="px-6 py-4">
-                        <div className="text-sm font-mono text-gray-900">
-                          #{movement.saleNumber}
-                        </div>
+                        {movement.saleNumber ? (
+                          <div>
+                            <div className="text-sm font-mono text-gray-900">#{movement.saleNumber}</div>
+                            <div className="text-xs text-gray-500">{movement.customerName}</div>
+                          </div>
+                        ) : (
+                          <span className="text-sm text-gray-500">Manual Edit</span>
+                        )}
                       </td>
                     </tr>
                   ))
@@ -356,17 +302,17 @@ const StockMovementsTab = () => {
         <div className="flex justify-end">
           <button
             onClick={() => {
-              // Create CSV export
               const csv = [
-                ['Date', 'Product', 'Code', 'Warehouse', 'Quantity', 'Customer', 'Sale #'],
+                ['Date', 'Product', 'Code', 'Warehouse', 'Type', 'Quantity', 'Change Type', 'Reference'],
                 ...filteredMovements.map(m => [
                   formatDate(m.date),
                   m.productName,
                   m.productCode,
                   m.warehouseName,
-                  m.quantity,
-                  m.customerName,
-                  m.saleNumber
+                  m.movementType,
+                  m.movementType === 'INCOMING' ? `+${m.quantity}` : `-${m.quantity}`,
+                  m.changeType,
+                  m.saleNumber ? `#${m.saleNumber} - ${m.customerName}` : 'Manual Edit'
                 ])
               ].map(row => row.join(',')).join('\n');
 
