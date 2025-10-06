@@ -3,7 +3,7 @@ import { Users, ShoppingCart, Package, TrendingUp } from 'lucide-react';
 import { PageHeader } from '../common/layout/PageHeader';
 import { StatsGrid } from '../common/layout/StatsGrid';
 import { LoadingSpinner } from '../common/ui/LoadingSpinner';
-import DashboardStats from './DashboardStats';
+
 import QuickActions from './QuickActions';
 import RecentActivity from './RecentActivity';
 import salesService from '../../api/salesService';
@@ -154,7 +154,7 @@ const DashboardOverview = ({ onNavigate }) => {
         </div>
       </div>
 
-      <DashboardStats />
+      
     </div>
   );
 };
