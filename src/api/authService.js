@@ -21,8 +21,8 @@ const api = axios.create({
 // Track last activity time to prevent too frequent session extensions
 let lastActivityExtension = 0;
 let tokenRefreshTimer = null;
-// Add response interceptor for debugging and error handling
 
+// Add response interceptor for debugging and error handling
 function setupAutoTokenRefresh(expiresAt) {
   if (tokenRefreshTimer) {
     clearTimeout(tokenRefreshTimer);
@@ -52,6 +52,7 @@ function setupAutoTokenRefresh(expiresAt) {
     }, refreshTime);
   }
 }
+
 api.interceptors.response.use(
   (response) => {
     if (import.meta.env.VITE_DEBUG === "true") {
@@ -84,7 +85,7 @@ api.interceptors.response.use(
 );
 
 const authService = {
-  // Login function
+  // Login function - FIXED VERSION
   async login(username, password) {
     try {
       console.log("🔐 Attempting login to:", `${API_BASE_URL}/auth/login`);
@@ -103,15 +104,7 @@ const authService = {
 
       const now = Date.now();
 
-      // Store tokens and login timestamp
-      sessionStorage.setItem("accessToken", accessToken);
-      sessionStorage.setItem("tokenExpiresAt", expirationTime.toString());
-      setupAutoTokenRefresh(expirationTime); // ADD THIS LINE
-      sessionStorage.setItem("user", JSON.stringify(user));
-      sessionStorage.setItem("loginTime", now.toString());
-      sessionStorage.setItem("lastActivity", now.toString());
-
-      // Set expiration time
+      // ✅ FIX: Calculate expirationTime FIRST before using it
       let expirationTime;
       if (expiresAt) {
         expirationTime = new Date(expiresAt).getTime();
@@ -120,7 +113,16 @@ const authService = {
         expirationTime = now + SESSION_TIMEOUT;
       }
 
+      // ✅ NOW store everything (expirationTime is already declared)
+      sessionStorage.setItem("accessToken", accessToken);
+      sessionStorage.setItem("refreshToken", refreshToken);
       sessionStorage.setItem("tokenExpiresAt", expirationTime.toString());
+      sessionStorage.setItem("user", JSON.stringify(user));
+      sessionStorage.setItem("loginTime", now.toString());
+      sessionStorage.setItem("lastActivity", now.toString());
+
+      // Setup auto-refresh after storing
+      setupAutoTokenRefresh(expirationTime);
 
       console.log("✅ Login successful for user:", user.username);
       console.log("🔐 Token expires at:", new Date(expirationTime));
@@ -156,7 +158,7 @@ const authService = {
   // Logout function
   async logout(refreshToken) {
     if (tokenRefreshTimer) {
-      clearTimeout(tokenRefreshTimer); // ADD THIS
+      clearTimeout(tokenRefreshTimer);
       tokenRefreshTimer = null;
     }
 
@@ -195,7 +197,7 @@ const authService = {
     return !!(token && user && this.isSessionValid());
   },
 
-  // Check if session is still valid - FIXED VERSION
+  // Check if session is still valid
   isSessionValid() {
     const tokenExpiresAt = sessionStorage.getItem("tokenExpiresAt");
     const loginTime = sessionStorage.getItem("loginTime");
@@ -230,7 +232,7 @@ const authService = {
     return true;
   },
 
-  // Get remaining session time in minutes - FIXED VERSION
+  // Get remaining session time in minutes
   getRemainingSessionTime() {
     const tokenExpiresAt = sessionStorage.getItem("tokenExpiresAt");
 
@@ -249,7 +251,7 @@ const authService = {
     return Math.floor(remainingTime / (1000 * 60));
   },
 
-  // Extend session by updating activity time - FIXED VERSION
+  // Extend session by updating activity time
   extendSession() {
     if (!this.isAuthenticated()) {
       return false;
@@ -316,7 +318,7 @@ const authService = {
     }
   },
 
-  // Refresh token
+  // Refresh token - FIXED VERSION
   async refreshToken() {
     try {
       const refreshToken = sessionStorage.getItem("refreshToken");
@@ -334,14 +336,7 @@ const authService = {
 
       const now = Date.now();
 
-      // Update tokens and session
-      sessionStorage.setItem("accessToken", accessToken);
-      if (newRefreshToken) {
-        sessionStorage.setItem("refreshToken", newRefreshToken);
-      }
-      sessionStorage.setItem("lastActivity", now.toString());
-
-      // Update expiration time
+      // ✅ FIX: Calculate expirationTime FIRST
       let expirationTime;
       if (expiresAt) {
         expirationTime = new Date(expiresAt).getTime();
@@ -349,13 +344,16 @@ const authService = {
         expirationTime = now + SESSION_TIMEOUT;
       }
 
+      // ✅ NOW update tokens and session
+      sessionStorage.setItem("accessToken", accessToken);
+      if (newRefreshToken) {
+        sessionStorage.setItem("refreshToken", newRefreshToken);
+      }
+      sessionStorage.setItem("lastActivity", now.toString());
       sessionStorage.setItem("tokenExpiresAt", expirationTime.toString());
-      setupAutoTokenRefresh(expirationTime); // ADD THIS LINE
 
-      console.log(
-        "Token refreshed successfully, expires at:",
-        new Date(expirationTime)
-      );
+      // Setup auto-refresh after storing
+      setupAutoTokenRefresh(expirationTime);
 
       console.log(
         "✅ Token refreshed successfully, expires at:",
