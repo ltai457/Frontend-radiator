@@ -1,44 +1,174 @@
 import React from 'react';
-import { formatCurrency, formatDateTime } from '../../utils/formatters';
+import { formatCurrency } from '../../utils/formatters';
 
-const RecentActivity = ({ sales = [], customers = [] }) => {
+const RecentActivity = ({ sales = [], stockMovements = [] }) => {
+  const resolveStatus = (sale) => {
+    const candidates = [
+      sale?.status,
+      sale?.saleStatus,
+      sale?.paymentStatus
+    ];
+
+    for (const candidate of candidates) {
+      if (!candidate) continue;
+      if (typeof candidate === 'string') return candidate;
+      if (typeof candidate === 'number') return String(candidate);
+
+      if (typeof candidate === 'object') {
+        const objectCandidates = [
+          candidate.status,
+          candidate.state,
+          candidate.name,
+          candidate.label,
+          candidate.value
+        ];
+
+        for (const nested of objectCandidates) {
+          if (typeof nested === 'string') return nested;
+          if (typeof nested === 'number') return String(nested);
+        }
+      }
+    }
+
+    return '';
+  };
+
+  const getCustomerDisplay = (sale) => {
+    if (sale?.customerName) return sale.customerName;
+
+    const customer = sale?.customer;
+    if (!customer) return 'Unknown customer';
+
+    if (typeof customer === 'string') return customer;
+
+    const nameParts = [customer.firstName, customer.lastName].filter(Boolean);
+    if (nameParts.length) return nameParts.join(' ');
+
+    if (customer.name) return customer.name;
+    if (customer.company) return customer.company;
+
+    return 'Unknown customer';
+  };
+
+  const getMovementQuantity = (movement) => {
+    const quantityCandidates = [
+      movement?.quantity,
+      movement?.quantityChange,
+      movement?.quantityIn,
+      movement?.quantityOut
+    ];
+
+    for (const candidate of quantityCandidates) {
+      if (candidate === null || candidate === undefined) continue;
+      const numeric = Number(candidate);
+      if (!Number.isNaN(numeric)) return numeric;
+    }
+
+    return 0;
+  };
+
+  const resolveMovementType = (movement) => {
+    const rawType = movement?.movementType || movement?.type || movement?.direction;
+    if (typeof rawType === 'string') {
+      const normalized = rawType.trim().toUpperCase();
+      if (normalized.endsWith('_STOCK')) {
+        return normalized.includes('IN') ? 'INCOMING' : 'OUTGOING';
+      }
+      return normalized;
+    }
+    return '';
+  };
+
+  const resolveMovementTime = (movement) => {
+    const candidates = [
+      movement?.movementDate,
+      movement?.createdAt,
+      movement?.updatedAt,
+      movement?.timestamp,
+      movement?.date
+    ];
+
+    for (const candidate of candidates) {
+      if (!candidate) continue;
+      const parsed = new Date(candidate);
+      if (!Number.isNaN(parsed.getTime())) return parsed;
+    }
+
+    return new Date();
+  };
+
   // Generate real activities from actual data
   const generateActivities = () => {
     const activities = [];
 
     // Add recent sales (last 5)
-    const recentSales = sales
-      .sort((a, b) => new Date(b.saleDate) - new Date(a.saleDate))
+    const recentSales = [...sales]
+      .sort((a, b) => new Date(b.saleDate || b.createdAt || 0) - new Date(a.saleDate || a.createdAt || 0))
       .slice(0, 3);
 
-    recentSales.forEach(sale => {
+    recentSales.forEach((sale) => {
+      const rawStatus = resolveStatus(sale);
+      const status = typeof rawStatus === 'string' ? rawStatus.toLowerCase() : '';
+      let message = 'Sale created';
+      let color = 'gray';
+
+      if (status === 'completed' || status === 'complete' || status === 'paid') {
+        message = 'Sale completed';
+        color = 'blue';
+      } else if (status === 'cancelled' || status === 'canceled') {
+        message = 'Sale cancelled';
+        color = 'red';
+      } else if (status === 'refunded') {
+        message = 'Sale refunded';
+        color = 'orange';
+      }
+
       activities.push({
         id: `sale-${sale.id}`,
         type: 'sale',
-        message: sale.status === 'Completed' ? 'Sale completed' : 
-                 sale.status === 'Cancelled' ? 'Sale cancelled' :
-                 sale.status === 'Refunded' ? 'Sale refunded' : 'Sale created',
-        details: `${sale.customerName} - ${formatCurrency(sale.totalAmount)}`,
-        time: new Date(sale.saleDate),
-        color: sale.status === 'Completed' ? 'blue' : 
-               sale.status === 'Cancelled' ? 'red' :
-               sale.status === 'Refunded' ? 'orange' : 'gray'
+        message,
+        details: `${getCustomerDisplay(sale)} - ${formatCurrency(sale.totalAmount)}`,
+        time: new Date(
+          sale.saleDate ||
+            sale.completedAt ||
+            sale.transactionDate ||
+            sale.createdAt ||
+            sale.updatedAt ||
+            Date.now()
+        ),
+        color
       });
     });
 
-    // Add recent customers (last 2)
-    const recentCustomers = customers
-      .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0))
-      .slice(0, 2);
+    // Add recent stock movements (incoming/outgoing)
+    const recentMovements = [...stockMovements]
+      .sort((a, b) => new Date(b.movementDate || b.createdAt || 0) - new Date(a.movementDate || a.createdAt || 0))
+      .slice(0, 3);
 
-    recentCustomers.forEach(customer => {
+    recentMovements.forEach(movement => {
+      const type = resolveMovementType(movement);
+      const isIncoming = type === 'INCOMING';
+
+      const movementId =
+        movement?.id ??
+        movement?.referenceId ??
+        movement?.transactionId ??
+        movement?.stockMovementId ??
+        Math.random().toString(36).slice(2);
+
       activities.push({
-        id: `customer-${customer.id}`,
-        type: 'customer',
-        message: 'New customer added',
-        details: `${customer.firstName} ${customer.lastName}${customer.company ? ` - ${customer.company}` : ''}`,
-        time: new Date(customer.createdAt || Date.now()),
-        color: 'purple'
+        id: `movement-${movementId}`,
+        type: isIncoming ? 'incoming' : 'outgoing',
+        message: isIncoming ? 'Stock received' : 'Stock dispatched',
+        details: `${movement.productName ||
+          movement.productCode ||
+          movement.radiatorName ||
+          movement.radiatorCode ||
+          'Stock item'} · ${getMovementQuantity(movement)} units · ${movement.warehouseName ||
+          movement.warehouseCode ||
+          'Unknown warehouse'}`,
+        time: resolveMovementTime(movement),
+        color: isIncoming ? 'green' : 'red'
       });
     });
 
@@ -60,19 +190,19 @@ const RecentActivity = ({ sales = [], customers = [] }) => {
             </svg>
           </div>
         );
-      case 'customer':
-        return (
-          <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center">
-            <svg className="w-4 h-4 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-            </svg>
-          </div>
-        );
-      case 'stock':
+      case 'incoming':
         return (
           <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
             <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h11M9 21V3m7 4l4 4-4 4" />
+            </svg>
+          </div>
+        );
+      case 'outgoing':
+        return (
+          <div className="w-8 h-8 bg-red-100 rounded-full flex items-center justify-center">
+            <svg className="w-4 h-4 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 14H10m6-11v18m-7-4l-4-4 4-4" />
             </svg>
           </div>
         );

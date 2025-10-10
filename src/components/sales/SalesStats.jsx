@@ -14,7 +14,7 @@ const SalesStats = ({ sales }) => {
       value: sales.length.toString(),
       color: 'blue',
       icon: ShoppingCart
-    },
+    }/* ,
     {
       title: 'Completed',
       value: completedSales.length.toString(),
@@ -32,7 +32,7 @@ const SalesStats = ({ sales }) => {
       value: formatCurrency(averageSale),
       color: 'orange',
       icon: TrendingUp
-    }
+    } */
   ];
 
   return <StatsGrid stats={stats} columns={4} />;

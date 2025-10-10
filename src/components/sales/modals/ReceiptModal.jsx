@@ -1,480 +1,197 @@
+// src/components/sales/ReceiptModal.jsx
 import React from 'react';
 import { Download, Printer } from 'lucide-react';
 import { Modal } from '../../common/ui/Modal';
 import { Button } from '../../common/ui/Button';
 import { formatCurrency, formatDateTime } from '../../../utils/formatters';
 
+const RECEIPT_CSS = `
+  /* Page setup for print */
+  @page { size: A4; margin: 18mm; }
+  html, body { background:#fff; margin:0; padding:0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; color:#1f2937; }
+
+  /* Container */
+  .rcpt-page { max-width: 820px; margin: 0 auto; }
+  .rcpt-card { background:#fff; }
+
+  /* Header */
+  .rcpt-header { display:flex; justify-content:space-between; align-items:center; padding-bottom:12px; border-bottom:3px solid #e5e7eb; margin-bottom:20px; }
+  .rcpt-title { font-size:32px; font-weight:800; color:#2563eb; letter-spacing:.5px; }
+  .rcpt-logo { width:64px; height:64px; border-radius:9999px; background:#d1d5db; display:flex; align-items:center; justify-content:center; color:#4b5563; font-weight:600; }
+
+  /* Meta grid */
+  .rcpt-grid { display:grid; grid-template-columns:1fr 1fr 1fr; gap:24px; margin-bottom:16px; }
+  .rcpt-block h4 { margin:0 0 6px 0; font-size:.85rem; font-weight:700; color:#374151; }
+  .rcpt-block p  { margin:0 0 4px 0; color:#4b5563; font-size:.9rem; }
+
+  /* Table */
+  .rcpt-table { width:100%; border-collapse:collapse; margin-top:8px; }
+  .rcpt-table thead th { background:#f3f4f6; color:#374151; font-weight:700; font-size:.8rem; padding:10px 8px; text-align:left; }
+  .rcpt-table thead th.rcpt-col-qty { width:64px; text-align:center; }
+  .rcpt-table thead th.rcpt-col-unit, .rcpt-table thead th.rcpt-col-amt { text-align:right; width:120px; }
+  .rcpt-table tbody td { padding:10px 8px; border-top:1px solid #f1f5f9; color:#374151; }
+  .rcpt-center { text-align:center; }
+  .rcpt-right  { text-align:right; }
+
+  /* Totals */
+  .rcpt-totals { width:300px; margin-left:auto; margin-top:12px; }
+  .rcpt-totals .row { display:flex; justify-content:space-between; padding:6px 0; }
+  .rcpt-totals .grand { border-top:1px solid #e5e7eb; margin-top:8px; padding-top:10px; font-weight:800; font-size:1.125rem; }
+
+  /* Signature */
+  .rcpt-sig { display:flex; justify-content:flex-end; margin-top:42px; }
+  .rcpt-sig-line { width:280px; height:40px; border-bottom:1px solid #9ca3af; }
+  .rcpt-sig-label { text-align:right; margin-top:6px; font-size:.85rem; color:#6b7280; }
+
+  /* Terms */
+  .rcpt-terms h5 { color:#ef4444; margin:0 0 6px 0; }
+  .rcpt-terms p  { margin:0 0 6px 0; color:#4b5563; }
+
+  /* On-screen spacing */
+  .rcpt-p-8 { padding: 2rem; }
+`;
+
+// === COMPONENT ===
 const ReceiptModal = ({ isOpen, onClose, receipt }) => {
   if (!receipt) return null;
 
-  const printReceipt = () => {
-    const printContent = document.getElementById('receipt-content').innerHTML;
-    const printWindow = window.open('', '_blank');
-    printWindow.document.write(`
-      <html>
-        <head>
-          <title>Receipt - ${receipt.sale.saleNumber}</title>
-          <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.1/dist/css/bootstrap.min.css" rel="stylesheet">
-          <style>
-            @media print {
-              @page { margin: 0.5in; size: A4; }
-              .d-print-none { display: none !important; }
-            }
-            body { 
-              font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-              background-color: #fff !important;
-            }
-            .receipt-container {
-              max-width: 800px;
-              margin: 0 auto;
-              background: white;
-              padding: 40px;
-            }
-            .company-header {
-              border-bottom: 3px solid #e9ecef;
-              padding-bottom: 20px;
-              margin-bottom: 30px;
-            }
-            .company-name {
-              font-size: 28px;
-              font-weight: 700;
-              color: #495057;
-              margin-bottom: 8px;
-            }
-            .company-details {
-              color: #6c757d;
-              font-size: 14px;
-              line-height: 1.6;
-            }
-            .receipt-title {
-              background: #f8f9fa;
-              padding: 12px 20px;
-              border-radius: 6px;
-              margin-bottom: 30px;
-              text-align: center;
-            }
-            .receipt-number {
-              font-size: 18px;
-              font-weight: 600;
-              color: #495057;
-            }
-            .status-badge {
-              background: #28a745;
-              color: white;
-              padding: 4px 12px;
-              border-radius: 20px;
-              font-size: 12px;
-              font-weight: 500;
-              margin-left: 10px;
-            }
-            .info-grid {
-              display: grid;
-              grid-template-columns: 1fr 1fr;
-              gap: 40px;
-              margin-bottom: 40px;
-            }
-            .info-section h5 {
-              font-size: 16px;
-              font-weight: 600;
-              color: #495057;
-              margin-bottom: 15px;
-              border-bottom: 1px solid #e9ecef;
-              padding-bottom: 8px;
-            }
-            .info-section p {
-              margin-bottom: 6px;
-              color: #6c757d;
-              font-size: 14px;
-            }
-            .info-section .highlight {
-              color: #495057;
-              font-weight: 500;
-            }
-            .items-table {
-              width: 100%;
-              border-collapse: collapse;
-              margin-bottom: 30px;
-            }
-            .items-table th {
-              background: #f8f9fa;
-              padding: 15px 12px;
-              font-size: 14px;
-              font-weight: 600;
-              color: #495057;
-              border-bottom: 2px solid #dee2e6;
-            }
-            .items-table td {
-              padding: 15px 12px;
-              border-bottom: 1px solid #e9ecef;
-              font-size: 14px;
-              color: #495057;
-            }
-            .item-name {
-              font-weight: 600;
-              color: #495057;
-              margin-bottom: 4px;
-            }
-            .item-details {
-              font-size: 12px;
-              color: #6c757d;
-            }
-            .totals-section {
-              border-top: 2px solid #dee2e6;
-              padding-top: 20px;
-            }
-            .totals-row {
-              display: flex;
-              justify-content: space-between;
-              padding: 8px 0;
-              font-size: 14px;
-            }
-            .totals-row.subtotal {
-              color: #6c757d;
-            }
-            .totals-row.tax {
-              color: #6c757d;
-            }
-            .totals-row.final {
-              border-top: 1px solid #dee2e6;
-              padding-top: 15px;
-              margin-top: 10px;
-              font-size: 18px;
-              font-weight: 700;
-              color: #495057;
-            }
-            .footer-message {
-              text-align: center;
-              margin-top: 40px;
-              padding-top: 20px;
-              border-top: 1px solid #e9ecef;
-              color: #6c757d;
-              font-size: 13px;
-            }
-            .text-end { text-align: right; }
-            .text-center { text-align: center; }
-            .fw-bold { font-weight: 600; }
-          </style>
-        </head>
-        <body>
-          <div class="receipt-container">${printContent}</div>
-        </body>
-      </html>
-    `);
-    printWindow.document.close();
-    printWindow.print();
-    printWindow.close();
-  };
+  const sale = receipt.sale || {};
+  const customer = sale.customer || {};
+  const items = Array.isArray(sale.items) ? sale.items : [];
 
-  const saveToPDF = () => {
-    const printContent = document.getElementById('receipt-content').innerHTML;
-    const printWindow = window.open('', '_blank');
-    printWindow.document.write(`
+  const subTotal =
+    sale.subTotal ??
+    items.reduce(
+      (sum, it) =>
+        sum +
+        (Number(it.totalPrice ?? (Number(it.unitPrice || 0) * Number(it.quantity || 0))) || 0),
+      0
+    );
+  const taxAmount = sale.taxAmount ?? subTotal * 0.15;
+  const totalAmount = sale.totalAmount ?? subTotal + taxAmount;
+
+  // Clean A4 print window using the SAME CSS as the modal
+  const openPrintWindow = (autoPrint = false) => {
+    const content = document.getElementById('receipt-content')?.innerHTML || '';
+    const w = window.open('', '_blank');
+    w.document.write(`
       <html>
         <head>
-          <title>Receipt - ${receipt.sale.saleNumber}</title>
-          <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.1/dist/css/bootstrap.min.css" rel="stylesheet">
-          <style>
-            @media print {
-              @page { margin: 0.5in; size: A4; }
-            }
-            body { 
-              font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-              background-color: #fff !important;
-            }
-            .receipt-container {
-              max-width: 800px;
-              margin: 0 auto;
-              background: white;
-              padding: 40px;
-            }
-            .company-header {
-              border-bottom: 3px solid #e9ecef;
-              padding-bottom: 20px;
-              margin-bottom: 30px;
-            }
-            .company-name {
-              font-size: 28px;
-              font-weight: 700;
-              color: #495057;
-              margin-bottom: 8px;
-            }
-            .company-details {
-              color: #6c757d;
-              font-size: 14px;
-              line-height: 1.6;
-            }
-            .receipt-title {
-              background: #f8f9fa;
-              padding: 12px 20px;
-              border-radius: 6px;
-              margin-bottom: 30px;
-              text-align: center;
-            }
-            .receipt-number {
-              font-size: 18px;
-              font-weight: 600;
-              color: #495057;
-            }
-            .status-badge {
-              background: #28a745;
-              color: white;
-              padding: 4px 12px;
-              border-radius: 20px;
-              font-size: 12px;
-              font-weight: 500;
-              margin-left: 10px;
-            }
-            .info-grid {
-              display: grid;
-              grid-template-columns: 1fr 1fr;
-              gap: 40px;
-              margin-bottom: 40px;
-            }
-            .info-section h5 {
-              font-size: 16px;
-              font-weight: 600;
-              color: #495057;
-              margin-bottom: 15px;
-              border-bottom: 1px solid #e9ecef;
-              padding-bottom: 8px;
-            }
-            .info-section p {
-              margin-bottom: 6px;
-              color: #6c757d;
-              font-size: 14px;
-            }
-            .info-section .highlight {
-              color: #495057;
-              font-weight: 500;
-            }
-            .items-table {
-              width: 100%;
-              border-collapse: collapse;
-              margin-bottom: 30px;
-            }
-            .items-table th {
-              background: #f8f9fa;
-              padding: 15px 12px;
-              font-size: 14px;
-              font-weight: 600;
-              color: #495057;
-              border-bottom: 2px solid #dee2e6;
-            }
-            .items-table td {
-              padding: 15px 12px;
-              border-bottom: 1px solid #e9ecef;
-              font-size: 14px;
-              color: #495057;
-            }
-            .item-name {
-              font-weight: 600;
-              color: #495057;
-              margin-bottom: 4px;
-            }
-            .item-details {
-              font-size: 12px;
-              color: #6c757d;
-            }
-            .totals-section {
-              border-top: 2px solid #dee2e6;
-              padding-top: 20px;
-            }
-            .totals-row {
-              display: flex;
-              justify-content: space-between;
-              padding: 8px 0;
-              font-size: 14px;
-            }
-            .totals-row.subtotal {
-              color: #6c757d;
-            }
-            .totals-row.tax {
-              color: #6c757d;
-            }
-            .totals-row.final {
-              border-top: 1px solid #dee2e6;
-              padding-top: 15px;
-              margin-top: 10px;
-              font-size: 18px;
-              font-weight: 700;
-              color: #495057;
-            }
-            .footer-message {
-              text-align: center;
-              margin-top: 40px;
-              padding-top: 20px;
-              border-top: 1px solid #e9ecef;
-              color: #6c757d;
-              font-size: 13px;
-            }
-            .text-end { text-align: right; }
-            .text-center { text-align: center; }
-            .fw-bold { font-weight: 600; }
-          </style>
-          <script>
-            window.onload = function() {
-              window.print();
-            };
-          </script>
+          <title>Receipt - ${sale.saleNumber || ''}</title>
+          <meta charset="utf-8" />
+          <meta name="viewport" content="width=device-width, initial-scale=1" />
+          <style>${RECEIPT_CSS}</style>
         </head>
         <body>
-          <div class="receipt-container">${printContent}</div>
+          <div class="rcpt-page rcpt-p-8">
+            ${content}
+          </div>
+          ${autoPrint ? '<script>window.onload=()=>{window.print();}</script>' : ''}
         </body>
       </html>
     `);
-    printWindow.document.close();
+    w.document.close();
   };
 
   return (
-    <Modal
-      isOpen={isOpen}
-      onClose={onClose}
-      title="Receipt"
-      size="xl"
-    >
-      <div className="flex justify-end gap-2 mb-4 d-print-none">
-        <Button 
-          variant="outline"
-          onClick={printReceipt}
-          icon={Printer}
-          size="sm"
-        >
+    <Modal isOpen={isOpen} onClose={onClose} size="xl">
+      {/* Inject the SAME CSS for on-screen view */}
+      <style dangerouslySetInnerHTML={{ __html: RECEIPT_CSS }} />
+
+      {/* On-screen actions (do not appear in PDF because we print from a clean window) */}
+      <div className="flex justify-end gap-2 mb-4 print:hidden">
+        <Button variant="outline" size="sm" icon={Printer} onClick={() => openPrintWindow(true)}>
           Print
         </Button>
-        <Button 
-          variant="outline"
-          onClick={saveToPDF}
-          icon={Download}
-          size="sm"
-        >
+        <Button variant="outline" size="sm" icon={Download} onClick={() => openPrintWindow(true)}>
           Save PDF
         </Button>
       </div>
 
-      <div id="receipt-content" className="bg-white">
-        {/* Company Header */}
-        <div className="company-header">
-          <div className="company-name">{receipt.companyName}</div>
-          <div className="company-details">
-            <div>{receipt.companyAddress}</div>
-            <div>{receipt.companyPhone} | {receipt.companyEmail}</div>
+      {/* RECEIPT CONTENT (same markup used for modal + print window) */}
+      <div id="receipt-content" className="rcpt-page rcpt-card rcpt-p-8">
+        {/* Header */}
+        <div className="rcpt-header">
+          <div className="rcpt-title">RECEIPT</div>
+          <div className="rcpt-logo">LOGO</div>
+        </div>
+
+        {/* Meta row */}
+        <div className="rcpt-grid">
+          <div className="rcpt-block">
+            <h4>BILL TO</h4>
+            <p>{customer.firstName} {customer.lastName}</p>
+            {customer.email && <p>{customer.email}</p>}
+            {customer.phone && <p>{customer.phone}</p>}
+          </div>
+
+          <div className="rcpt-block">
+            <h4>SHIP TO</h4>
+            <p>{sale.shippingName || `${customer.firstName || ''} ${customer.lastName || ''}`}</p>
+            {sale.shippingAddress && <p>{sale.shippingAddress}</p>}
+          </div>
+
+          <div className="rcpt-block">
+            <p><span className="font-semibold">Receipt #:</span> {sale.saleNumber || '—'}</p>
+            <p><span className="font-semibold">Receipt Date:</span> {sale.saleDate ? formatDateTime(sale.saleDate) : formatDateTime(new Date())}</p>
+            {sale.poNumber && <p><span className="font-semibold">P.O #:</span> {sale.poNumber}</p>}
+            {sale.dueDate && <p><span className="font-semibold">Due Date:</span> {formatDateTime(sale.dueDate)}</p>}
           </div>
         </div>
 
-        {/* Receipt Title */}
-        <div className="receipt-title">
-          <span className="receipt-number">Receipt #{receipt.sale.saleNumber}</span>
-          <span className="status-badge">Paid</span>
-        </div>
-
-        {/* Receipt Info Grid */}
-        <div className="info-grid">
-          <div className="info-section">
-            <h5>Billed To:</h5>
-            <p className="highlight">
-              {receipt.sale.customer.firstName} {receipt.sale.customer.lastName}
-            </p>
-            {receipt.sale.customer.email && (
-              <p>{receipt.sale.customer.email}</p>
-            )}
-            {receipt.sale.customer.phone && (
-              <p>{receipt.sale.customer.phone}</p>
-            )}
-          </div>
-          <div className="info-section text-end">
-            <div style={{marginBottom: '20px'}}>
-              <h5 style={{textAlign: 'left'}}>Receipt No:</h5>
-              <p>#{receipt.sale.saleNumber}</p>
-            </div>
-            <div style={{marginBottom: '20px'}}>
-              <h5 style={{textAlign: 'left'}}>Receipt Date:</h5>
-              <p>{formatDateTime(receipt.sale.saleDate)}</p>
-            </div>
-            <div>
-              <h5 style={{textAlign: 'left'}}>Payment Method:</h5>
-              <p>{receipt.sale.paymentMethod}</p>
-            </div>
-          </div>
-        </div>
-
-        {/* Items Table */}
-        <div>
-          <h5 style={{fontSize: '16px', fontWeight: '600', color: '#495057', marginBottom: '20px'}}>
-            Order Summary
-          </h5>
-          <table className="items-table">
-            <thead>
-              <tr>
-                <th style={{width: '60px', textAlign: 'center'}}>No.</th>
-                <th style={{textAlign: 'left'}}>Item</th>
-                <th style={{textAlign: 'right'}}>Price</th>
-                <th style={{textAlign: 'center', width: '80px'}}>Quantity</th>
-                <th style={{textAlign: 'right', width: '120px'}}>Total</th>
-              </tr>
-            </thead>
-            <tbody>
-              {receipt.sale.items?.map((item, index) => (
-                <tr key={index}>
-                  <td className="text-center fw-bold">{String(index + 1).padStart(2, '0')}</td>
-                  <td>
-                    <div className="item-name">
-                      {item.radiator?.name || item.radiatorName || 'Unknown Product'}
-                    </div>
-                    <div className="item-details">
-                      {item.radiator?.brand || item.brand} - {item.radiator?.code || item.radiatorCode}
-                      {item.warehouse && (
-                        <span> | Warehouse: {item.warehouse.name || item.warehouse.code}</span>
-                      )}
-                    </div>
-                  </td>
-                  <td className="text-end">{formatCurrency(item.unitPrice)}</td>
-                  <td className="text-center">{item.quantity}</td>
-                  <td className="text-end fw-bold">{formatCurrency(item.totalPrice)}</td>
-                </tr>
-              ))}
+        {/* Items table */}
+        <table className="rcpt-table">
+          <thead>
+            <tr>
+              <th className="rcpt-col-qty">QTY</th>
+              <th>Product</th>
               
-              {/* Totals in table */}
-              <tr>
-                <td colSpan="4" className="text-end" style={{borderBottom: 'none', paddingBottom: '8px'}}>
-                  <strong>Sub Total</strong>
-                </td>
-                <td className="text-end fw-bold" style={{borderBottom: 'none', paddingBottom: '8px'}}>
-                  {formatCurrency(receipt.sale.subTotal)}
-                </td>
-              </tr>
-              <tr>
-                <td colSpan="4" className="text-end" style={{borderBottom: 'none', paddingBottom: '8px'}}>
-                  GST (15%):
-                </td>
-                <td className="text-end" style={{borderBottom: 'none', paddingBottom: '8px'}}>
-                  {formatCurrency(receipt.sale.taxAmount)}
+              <th className="rcpt-col-unit">UNIT PRICE</th>
+              <th className="rcpt-col-amt">AMOUNT</th>
+            </tr>
+          </thead>
+          <tbody>
+            {items.map((it, i) => (
+              <tr key={i}>
+                <td className="rcpt-center">{it.quantity}</td>
+                <td>{it.radiator?.name || it.radiatorName || it.name || 'Item'}</td>
+                <td className="rcpt-right">{formatCurrency(it.unitPrice)}</td>
+                <td className="rcpt-right">
+                  {formatCurrency(it.totalPrice ?? (Number(it.unitPrice || 0) * Number(it.quantity || 0)))}
                 </td>
               </tr>
-              <tr>
-                <td colSpan="4" className="text-end" style={{borderTop: '2px solid #dee2e6', paddingTop: '15px', borderBottom: 'none'}}>
-                  <strong style={{fontSize: '18px'}}>Total</strong>
-                </td>
-                <td className="text-end" style={{borderTop: '2px solid #dee2e6', paddingTop: '15px', borderBottom: 'none'}}>
-                  <strong style={{fontSize: '18px', color: '#495057'}}>
-                    {formatCurrency(receipt.sale.totalAmount)}
-                  </strong>
-                </td>
-              </tr>
-            </tbody>
-          </table>
+            ))}
+          </tbody>
+        </table>
+
+        {/* Totals */}
+        <div className="rcpt-totals">
+          <div className="row"><span>Subtotal</span><span>{formatCurrency(subTotal)}</span></div>
+          <div className="row"><span>GST (15%)</span><span>{formatCurrency(taxAmount)}</span></div>
+          <div className="row grand"><span>Total</span><span>{formatCurrency(totalAmount)}</span></div>
         </div>
 
-        {/* Footer */}
-        <div className="footer-message">
-          <div style={{fontWeight: '600', marginBottom: '8px'}}>Thank you for your business!</div>
-          <div>For warranty claims or inquiries, please contact us with your receipt number.</div>
-          <div style={{marginTop: '16px', fontSize: '12px'}}>
-            Generated on {formatDateTime(new Date())}
+        {/* Signature */}
+        <div className="rcpt-sig">
+          <div>
+            <div className="rcpt-sig-line"></div>
+            <div className="rcpt-sig-label">Authorized Signature</div>
           </div>
         </div>
+
+        {/* Terms */}
+        <div className="rcpt-terms" style={{ marginTop: '2rem' }}>
+          <h5>TERMS & CONDITIONS</h5>
+          <p>{receipt.terms || 'Payment is due within 15 days.'}</p>
+          {receipt.bankLine && <p style={{ marginTop: '.5rem' }}>{receipt.bankLine}</p>}
+        </div>
+
+        {/* Optional footer */}
+        <div style={{ marginTop: '2rem', fontStyle: 'italic' }}>Thank you</div>
       </div>
     </Modal>
   );
 };
 
-export default ReceiptModal
+export default ReceiptModal;

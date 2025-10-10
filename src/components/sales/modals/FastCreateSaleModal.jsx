@@ -1315,29 +1315,7 @@ const handleAddProduct = (radiator) => {
         )}
 
         {/* ✅ DEBUG PANEL - Remove in production */}
-        <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
-          <h4 className="font-semibold text-gray-800 mb-2">
-            🔍 Debug Information
-          </h4>
-          <div className="text-xs text-gray-600 space-y-1">
-            <div>Customers loaded: {customers.length}</div>
-            <div>Radiators loaded: {radiators.length}</div>
-            <div>Warehouses loaded: {warehouses.length}</div>
-            <div>Loading states: {JSON.stringify(loadingStates)}</div>
-            {warehouses.length > 0 && (
-              <div>
-                <div>Warehouse list:</div>
-                <ul className="ml-2">
-                  {warehouses.map((w) => (
-                    <li key={w.id}>
-                      • {w.name} (ID: {w.id})
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-          </div>
-        </div>
+        
       </div>
 
       {/* Click outside handlers */}

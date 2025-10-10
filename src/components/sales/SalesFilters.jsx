@@ -20,17 +20,7 @@ const SalesFilters = ({ filters, onFilterChange, onClearFilters, hasActiveFilter
         </div>
         
         <div className="flex gap-2">
-          <select
-            value={filters.status || 'all'}
-            onChange={(e) => onFilterChange('status', e.target.value)}
-            className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-          >
-            <option value="all">All Status</option>
-            <option value="Completed">Completed</option>
-            <option value="Pending">Pending</option>
-            <option value="Cancelled">Cancelled</option>
-            <option value="Refunded">Refunded</option>
-          </select>
+          
           
           <Button
             variant="outline"
