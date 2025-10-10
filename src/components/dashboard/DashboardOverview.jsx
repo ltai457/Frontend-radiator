@@ -207,23 +207,104 @@ const DashboardOverview = ({ onNavigate }) => {
       (customer) => customer?.isActive !== false
     ).length;
 
-    const lowStockItems = radiators.filter((radiator) => {
-      if (!radiator?.stock) return false;
-      const totalStock = Object.values(radiator.stock).reduce(
-        (sum, qty) => sum + Number(qty || 0),
-        0
-      );
-      return totalStock > 0 && totalStock <= 5;
-    }).length;
+    const LOW_STOCK_THRESHOLD = 5;
 
-    const outOfStockItems = radiators.filter((radiator) => {
-      if (!radiator?.stock) return true;
-      const totalStock = Object.values(radiator.stock).reduce(
-        (sum, qty) => sum + Number(qty || 0),
-        0
+    const extractWarehouseStocks = (radiator) => {
+      const candidates = [
+        radiator?.stock,
+        radiator?.stockLevels,
+        radiator?.stockByWarehouse,
+        radiator?.warehouseStock,
+        radiator?.warehouses,
+        radiator?.inventory
+      ];
+
+      for (const candidate of candidates) {
+        if (!candidate) continue;
+
+        if (Array.isArray(candidate)) {
+          const entries = candidate
+            .map((item) => {
+              if (item == null) return null;
+              if (typeof item === 'number') return item;
+              if (typeof item === 'string') return Number(item);
+              if (typeof item === 'object') {
+                const quantity =
+                  item.quantity ??
+                  item.qty ??
+                  item.stock ??
+                  item.available ??
+                  item.onHand ??
+                  item.level;
+                if (quantity == null) return null;
+                return Number(quantity);
+              }
+              return null;
+            })
+            .filter((qty) => qty != null && Number.isFinite(qty));
+
+          if (entries.length) return entries;
+        } else if (typeof candidate === 'object') {
+          const entries = Object.values(candidate)
+            .map((value) => {
+              if (value == null) return null;
+              if (typeof value === 'number') return value;
+              if (typeof value === 'string') return Number(value);
+              if (typeof value === 'object') {
+                const quantity =
+                  value.quantity ??
+                  value.qty ??
+                  value.stock ??
+                  value.available ??
+                  value.onHand ??
+                  value.level;
+                if (quantity == null) return null;
+                return Number(quantity);
+              }
+              return null;
+            })
+            .filter((qty) => qty != null && Number.isFinite(qty));
+
+          if (entries.length) return entries;
+        }
+      }
+
+      return [];
+    };
+
+    const stockEvaluations = radiators.map((radiator) => {
+      const stocks = extractWarehouseStocks(radiator).map((qty) =>
+        Number.isFinite(qty) ? qty : 0
       );
-      return totalStock === 0;
-    }).length;
+
+      if (!stocks.length) {
+        return {
+          isOutOfStock: true,
+          isLowStock: false
+        };
+      }
+
+      const totalStock = stocks.reduce((sum, qty) => sum + qty, 0);
+      const anyPositive = stocks.some((qty) => qty > 0);
+      const anyLowWarehouse = stocks.some(
+        (qty) => qty > 0 && qty <= LOW_STOCK_THRESHOLD
+      );
+
+      return {
+        isOutOfStock: !anyPositive,
+        isLowStock:
+          anyLowWarehouse ||
+          (anyPositive && totalStock > 0 && totalStock <= LOW_STOCK_THRESHOLD)
+      };
+    });
+
+    const lowStockItems = stockEvaluations.filter(
+      (evaluation) => evaluation.isLowStock && !evaluation.isOutOfStock
+    ).length;
+
+    const outOfStockItems = stockEvaluations.filter(
+      (evaluation) => evaluation.isOutOfStock
+    ).length;
 
     /* const salesChange = calculatePercentageChange(
       todaysSalesCount,
