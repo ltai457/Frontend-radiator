@@ -1,121 +1,72 @@
 // src/api/salesService.js
-import axios from 'axios';
-import authService from './authService';
+import httpClient from "./httpClient";
+import { createCrudService, handleRequest } from "./apiHelpers";
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE || 'http://localhost:5128/api/v1';
-
-// Create axios instance with auth interceptor
-const api = axios.create({
-  baseURL: API_BASE_URL,
-  headers: {
-    'Content-Type': 'application/json'
-  }
-});
-
-// Add token to requests using the secure auth service
-api.interceptors.request.use((config) => {
-  const token = authService.getValidToken();
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-  return config;
+const salesCrud = createCrudService("/sales", {
+  resourceName: "sale",
+  resourceNamePlural: "sales",
+  messages: {
+    list: "Failed to fetch sales",
+    get: "Failed to fetch sale",
+    create: "Failed to create sale",
+    update: "Failed to update sale",
+    remove: "Failed to delete sale",
+  },
 });
 
 const salesService = {
-  // Create a new sale
-  async create(saleData) {
-    try {
-      const response = await api.post('/sales', saleData);
-      return { success: true, data: response.data };
-    } catch (error) {
-      return { 
-        success: false, 
-        error: error.response?.data?.message || 'Failed to create sale' 
-      };
-    }
+  create(saleData) {
+    return salesCrud.create(saleData);
   },
 
-  // Get all sales
-  async getAll() {
-    try {
-      const response = await api.get('/sales');
-      return { success: true, data: response.data };
-    } catch (error) {
-      return { 
-        success: false, 
-        error: error.response?.data?.message || 'Failed to fetch sales' 
-      };
-    }
+  getAll(params) {
+    return salesCrud.list(params);
   },
 
-  // Get single sale by ID
-  async getById(id) {
-    try {
-      const response = await api.get(`/sales/${id}`);
-      return { success: true, data: response.data };
-    } catch (error) {
-      return { 
-        success: false, 
-        error: error.response?.data?.message || 'Failed to fetch sale' 
-      };
-    }
+  getById(id) {
+    return salesCrud.get(id);
   },
 
-  // Get sales by date range
   async getByDateRange(fromDate, toDate) {
-    try {
-      const params = new URLSearchParams({
-        fromDate: fromDate.toISOString(),
-        toDate: toDate.toISOString()
-      });
-      const response = await api.get(`/sales/by-date?${params}`);
-      return { success: true, data: response.data };
-    } catch (error) {
-      return { 
-        success: false, 
-        error: error.response?.data?.message || 'Failed to fetch sales by date range' 
-      };
-    }
+    const params = {
+      fromDate: fromDate.toISOString(),
+      toDate: toDate.toISOString(),
+    };
+
+    return handleRequest(
+      () => httpClient.get("/sales/by-date", { params }),
+      {
+        fallbackMessage: "Failed to fetch sales by date range",
+      }
+    );
   },
 
-  // Get receipt for a sale
-  async getReceipt(saleId) {
-    try {
-      const response = await api.get(`/sales/${saleId}/receipt`);
-      return { success: true, data: response.data };
-    } catch (error) {
-      return { 
-        success: false, 
-        error: error.response?.data?.message || 'Failed to fetch receipt' 
-      };
-    }
+  getReceipt(saleId) {
+    return handleRequest(
+      () => httpClient.get(`/sales/${saleId}/receipt`),
+      {
+        fallbackMessage: "Failed to fetch receipt",
+      }
+    );
   },
 
-  // Cancel a sale (Admin only)
-  async cancel(saleId) {
-    try {
-      const response = await api.post(`/sales/${saleId}/cancel`);
-      return { success: true, data: response.data };
-    } catch (error) {
-      return { 
-        success: false, 
-        error: error.response?.data?.message || 'Failed to cancel sale' 
-      };
-    }
+  cancel(saleId) {
+    return handleRequest(
+      () => httpClient.post(`/sales/${saleId}/cancel`),
+      {
+        fallbackMessage: "Failed to cancel sale",
+      }
+    );
   },
 
-  // Refund a sale (Admin only)
-  async refund(saleId) {
-    try {
-      const response = await api.post(`/sales/${saleId}/refund`);
-      return { success: true, data: response.data };
-    } catch (error) {
-      return { 
-        success: false, 
-        error: error.response?.data?.message || 'Failed to refund sale' 
-      };
-    }
-  }
+  refund(saleId) {
+    return handleRequest(
+      () => httpClient.post(`/sales/${saleId}/refund`),
+      {
+        fallbackMessage: "Failed to refund sale",
+      }
+    );
+  },
 };
 
 export default salesService;

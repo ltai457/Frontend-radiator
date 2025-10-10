@@ -1,274 +1,214 @@
 // src/api/stockService.js
-import axios from "axios";
-import authService from "./authService";
+import httpClient from "./httpClient";
+import { handleRequest } from "./apiHelpers";
 
-const API_BASE_URL =
-  import.meta.env.VITE_API_BASE || "http://localhost:5128/api/v1";
+function buildStockMovementParams(params = {}) {
+  const query = {};
 
-// Create axios instance with auth interceptor
-const api = axios.create({
-  baseURL: API_BASE_URL,
-  headers: {
-    "Content-Type": "application/json",
-  },
-});
-
-// Add token to requests using the secure auth service
-api.interceptors.request.use((config) => {
-  const token = authService.getValidToken();
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
+  if (params.radiatorId) {
+    query.radiatorId = params.radiatorId;
   }
-  return config;
-});
-
-// Add response interceptor for debugging
-api.interceptors.response.use(
-  (response) => {
-    if (import.meta.env.VITE_DEBUG === "true") {
-      console.log(
-        "✅ Stock API Success:",
-        response.config.method.toUpperCase(),
-        response.config.url,
-        response.status
-      );
-    }
-    return response;
-  },
-  (error) => {
-    console.error(
-      "❌ Stock API Error:",
-      error.config?.method?.toUpperCase(),
-      error.config?.url,
-      error.response?.status,
-      error.response?.data
-    );
-    return Promise.reject(error);
+  if (params.warehouseCode) {
+    query.warehouseCode = params.warehouseCode;
   }
-);
+  if (params.fromDate instanceof Date) {
+    query.fromDate = params.fromDate.toISOString();
+  }
+  if (params.toDate instanceof Date) {
+    query.toDate = params.toDate.toISOString();
+  }
+  if (params.movementType) {
+    query.movementType = params.movementType;
+  }
+  if (params.limit) {
+    query.limit = params.limit;
+  }
+
+  return query;
+}
 
 const stockService = {
-  // Get stock levels for a specific radiator across all warehouses
   async getRadiatorStock(radiatorId) {
-    try {
-      console.log("📦 Fetching stock for radiator:", radiatorId);
-      const response = await api.get(`/radiators/${radiatorId}/stock`);
-      console.log("✅ Stock data loaded:", response.data);
-      return { success: true, data: response.data };
-    } catch (error) {
-      console.error(
-        "❌ Get radiator stock error:",
-        error.response?.data || error.message
-      );
-      return {
-        success: false,
-        error: error.response?.data?.message || "Failed to fetch stock levels",
-      };
+    console.log("📦 Fetching stock for radiator:", radiatorId);
+    const result = await handleRequest(
+      () => httpClient.get(`/radiators/${radiatorId}/stock`),
+      {
+        fallbackMessage: "Failed to fetch stock levels",
+      }
+    );
+
+    if (result.success) {
+      console.log("✅ Stock data loaded:", result.data);
+    } else {
+      console.error("❌ Get radiator stock error:", result.error);
     }
+
+    return result;
   },
 
-  // Update stock for a specific radiator at a specific warehouse
   async updateStock(radiatorId, warehouseCode, quantity) {
-    try {
-      console.log("📝 Updating stock:", {
-        radiatorId,
-        warehouseCode,
-        quantity,
-      });
+    console.log("📝 Updating stock:", {
+      radiatorId,
+      warehouseCode,
+      quantity,
+    });
 
-      const payload = {
-        warehouseCode: warehouseCode.toUpperCase(),
-        quantity: parseInt(quantity, 10),
-      };
+    const payload = {
+      warehouseCode: warehouseCode.toUpperCase(),
+      quantity: parseInt(quantity, 10),
+    };
 
-      console.log("📤 Sending stock update payload:", payload);
+    console.log("📤 Sending stock update payload:", payload);
 
-      const response = await api.post(
-        `/radiators/${radiatorId}/stock`,
-        payload
-      );
+    const result = await handleRequest(
+      () => httpClient.post(`/radiators/${radiatorId}/stock`, payload),
+      {
+        fallbackMessage: "Failed to update stock",
+      }
+    );
 
-      console.log("✅ Stock updated successfully:", response.data);
-
-      return { success: true, data: response.data };
-    } catch (error) {
-      console.error(
-        "❌ Update stock error:",
-        error.response?.data || error.message
-      );
-      return {
-        success: false,
-        error: error.response?.data?.message || "Failed to update stock",
-      };
+    if (result.success) {
+      console.log("✅ Stock updated successfully:", result.data);
+    } else {
+      console.error("❌ Update stock error:", result.error);
     }
+
+    return result;
   },
-  // Get stock movements (both incoming and outgoing)
+
   async getStockMovements(params = {}) {
-    try {
-      const queryParams = new URLSearchParams();
+    const query = buildStockMovementParams(params);
 
-      if (params.radiatorId)
-        queryParams.append("radiatorId", params.radiatorId);
-      if (params.warehouseCode)
-        queryParams.append("warehouseCode", params.warehouseCode);
-      if (params.fromDate)
-        queryParams.append("fromDate", params.fromDate.toISOString());
-      if (params.toDate)
-        queryParams.append("toDate", params.toDate.toISOString());
-      if (params.movementType)
-        queryParams.append("movementType", params.movementType);
-      if (params.limit) queryParams.append("limit", params.limit);
+    const result = await handleRequest(
+      () => httpClient.get("/stock/movements", { params: query }),
+      {
+        fallbackMessage: "Failed to fetch stock movements",
+      }
+    );
 
-      const url = `/stock/movements${
-        queryParams.toString() ? "?" + queryParams.toString() : ""
-      }`;
-      const response = await api.get(url);
-
-      console.log("✅ Stock movements loaded:", response.data.length);
-      return { success: true, data: response.data };
-    } catch (error) {
-      console.error(
-        "❌ Get stock movements error:",
-        error.response?.data || error.message
-      );
-      return {
-        success: false,
-        error:
-          error.response?.data?.message || "Failed to fetch stock movements",
-      };
+    if (result.success) {
+      console.log("✅ Stock movements loaded:", result.data.length);
+    } else {
+      console.error("❌ Get stock movements error:", result.error);
     }
+
+    return result;
   },
 
-  // Get all radiators with their stock levels (with fallback to existing endpoints)
   async getAllRadiatorsWithStock(
     search = null,
     lowStockOnly = false,
     warehouseCode = null
   ) {
+    console.log("📊 Fetching all radiators with stock...");
+
+    const params = {};
+    if (search) params.search = search;
+    if (lowStockOnly) params.lowStockOnly = "true";
+    if (warehouseCode) params.warehouseCode = warehouseCode;
+
     try {
-      console.log("📊 Fetching all radiators with stock...");
-
-      // Try enhanced endpoint first
-      try {
-        const params = new URLSearchParams();
-        if (search) params.append("search", search);
-        if (lowStockOnly) params.append("lowStockOnly", "true");
-        if (warehouseCode) params.append("warehouseCode", warehouseCode);
-
-        const url = `/stock/all-radiators${
-          params.toString() ? "?" + params.toString() : ""
-        }`;
-        const response = await api.get(url);
-
-        console.log(
-          "✅ Radiators with stock loaded (enhanced):",
-          response.data.length,
-          "items"
-        );
-        return { success: true, data: response.data };
-      } catch (enhancedError) {
-        console.log(
-          "ℹ️ Enhanced endpoint not available, using fallback method..."
-        );
-
-        // Fallback: Get radiators first, then stock for each
-        const radiatorsResponse = await api.get("/radiators");
-
-        if (!radiatorsResponse.data) {
-          return { success: false, error: "No radiators data received" };
-        }
-
-        const radiatorsWithStock = [];
-
-        // For each radiator, fetch its stock levels
-        for (const radiator of radiatorsResponse.data) {
-          try {
-            const stockResponse = await this.getRadiatorStock(radiator.id);
-            const radiatorData = {
-              ...radiator,
-              stock: stockResponse.success ? stockResponse.data.stock : {},
-            };
-
-            // Apply client-side filtering if needed
-            let shouldInclude = true;
-
-            if (search) {
-              const searchLower = search.toLowerCase();
-              shouldInclude =
-                radiator.name.toLowerCase().includes(searchLower) ||
-                radiator.code.toLowerCase().includes(searchLower) ||
-                radiator.brand.toLowerCase().includes(searchLower);
-            }
-
-            if (shouldInclude && lowStockOnly) {
-              const hasLowStock = Object.values(radiatorData.stock || {}).some(
-                (qty) => qty > 0 && qty <= 5
-              );
-              const hasOutOfStock = Object.values(
-                radiatorData.stock || {}
-              ).some((qty) => qty === 0);
-              shouldInclude = hasLowStock || hasOutOfStock;
-            }
-
-            if (shouldInclude && warehouseCode) {
-              shouldInclude = radiatorData.stock.hasOwnProperty(
-                warehouseCode.toUpperCase()
-              );
-            }
-
-            if (shouldInclude) {
-              radiatorsWithStock.push(radiatorData);
-            }
-          } catch (error) {
-            console.warn(
-              `Failed to fetch stock for radiator ${radiator.id}:`,
-              error
-            );
-            radiatorsWithStock.push({
-              ...radiator,
-              stock: {},
-            });
-          }
-        }
-
-        console.log(
-          "✅ Radiators with stock loaded (fallback):",
-          radiatorsWithStock.length,
-          "items"
-        );
-        return { success: true, data: radiatorsWithStock };
-      }
-    } catch (error) {
-      console.error(
-        "❌ Get radiators with stock error:",
-        error.response?.data || error.message
+      const response = await httpClient.get("/stock/all-radiators", {
+        params,
+      });
+      console.log(
+        "✅ Radiators with stock loaded (enhanced):",
+        response.data.length,
+        "items"
       );
-      return {
-        success: false,
-        error:
-          error.response?.data?.message ||
-          "Failed to fetch radiators with stock",
-      };
+      return { success: true, data: response.data };
+    } catch (enhancedError) {
+      console.log(
+        "ℹ️ Enhanced endpoint not available, using fallback method..."
+      );
     }
+
+    const radiatorsResponse = await handleRequest(
+      () => httpClient.get("/radiators"),
+      {
+        fallbackMessage: "Failed to fetch radiators - check API connection",
+      }
+    );
+
+    if (!radiatorsResponse.success || !radiatorsResponse.data) {
+      return radiatorsResponse;
+    }
+
+    const radiatorsWithStock = [];
+
+    for (const radiator of radiatorsResponse.data) {
+      try {
+        const stockResponse = await this.getRadiatorStock(radiator.id);
+        const radiatorData = {
+          ...radiator,
+          stock: stockResponse.success ? stockResponse.data.stock : {},
+        };
+
+        let shouldInclude = true;
+
+        if (search) {
+          const searchLower = search.toLowerCase();
+          shouldInclude =
+            radiator.name.toLowerCase().includes(searchLower) ||
+            radiator.code.toLowerCase().includes(searchLower) ||
+            radiator.brand.toLowerCase().includes(searchLower);
+        }
+
+        if (shouldInclude && lowStockOnly) {
+          const stockValues = Object.values(radiatorData.stock || {});
+          const hasLowStock = stockValues.some(
+            (qty) => qty > 0 && qty <= 5
+          );
+          const hasOutOfStock = stockValues.some((qty) => qty === 0);
+          shouldInclude = hasLowStock || hasOutOfStock;
+        }
+
+        if (shouldInclude && warehouseCode) {
+          shouldInclude = Object.prototype.hasOwnProperty.call(
+            radiatorData.stock,
+            warehouseCode.toUpperCase()
+          );
+        }
+
+        if (shouldInclude) {
+          radiatorsWithStock.push(radiatorData);
+        }
+      } catch (error) {
+        console.warn(
+          `Failed to fetch stock for radiator ${radiator.id}:`,
+          error
+        );
+        radiatorsWithStock.push({
+          ...radiator,
+          stock: {},
+        });
+      }
+    }
+
+    console.log(
+      "✅ Radiators with stock loaded (fallback):",
+      radiatorsWithStock.length,
+      "items"
+    );
+    return { success: true, data: radiatorsWithStock };
   },
 
-  // Get stock summary across all warehouses for dashboard
   async getStockSummary() {
-    try {
-      console.log("📊 Fetching stock summary...");
-      const response = await api.get("/stock/summary");
-      console.log("✅ Stock summary loaded:", response.data);
-      return { success: true, data: response.data };
-    } catch (error) {
-      console.error(
-        "❌ Get stock summary error:",
-        error.response?.data || error.message
-      );
-      return {
-        success: false,
-        error: error.response?.data?.message || "Failed to fetch stock summary",
-      };
+    console.log("📊 Fetching stock summary...");
+    const result = await handleRequest(
+      () => httpClient.get("/stock/summary"),
+      {
+        fallbackMessage: "Failed to fetch stock summary",
+      }
+    );
+
+    if (result.success) {
+      console.log("✅ Stock summary loaded:", result.data);
+    } else {
+      console.error("❌ Get stock summary error:", result.error);
     }
+
+    return result;
   },
 };
 

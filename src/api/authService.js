@@ -1,5 +1,6 @@
 // src/api/authService.js
 import axios from "axios";
+import { setAuthTokenProvider } from "./httpClient";
 
 const API_BASE_URL =
   import.meta.env.VITE_API_BASE || "http://localhost:5128/api/v1";
@@ -435,6 +436,8 @@ const authService = {
     }
   },
 };
+
+setAuthTokenProvider(() => authService.getValidToken());
 
 // Add token to requests if available
 api.interceptors.request.use((config) => {

@@ -1,104 +1,48 @@
 // src/api/customerService.js
-import axios from 'axios';
-import authService from './authService';
+import httpClient from "./httpClient";
+import { createCrudService, handleRequest } from "./apiHelpers";
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE || 'http://localhost:5128/api/v1';
-
-// Create axios instance with auth interceptor
-const api = axios.create({
-  baseURL: API_BASE_URL,
-  headers: {
-    'Content-Type': 'application/json'
-  }
-});
-
-// Add token to requests using the secure auth service
-api.interceptors.request.use((config) => {
-  const token = authService.getValidToken();
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-  return config;
+const customerCrud = createCrudService("/customers", {
+  resourceName: "customer",
+  resourceNamePlural: "customers",
+  messages: {
+    list: "Failed to fetch customers",
+    get: "Failed to fetch customer",
+    create: "Failed to create customer",
+    update: "Failed to update customer",
+    remove: "Failed to delete customer",
+  },
 });
 
 const customerService = {
-  // Get all customers
-  async getAll() {
-    try {
-      const response = await api.get('/customers');
-      return { success: true, data: response.data };
-    } catch (error) {
-      return { 
-        success: false, 
-        error: error.response?.data?.message || 'Failed to fetch customers' 
-      };
-    }
+  getAll(params) {
+    return customerCrud.list(params);
   },
 
-  // Get single customer by ID
-  async getById(id) {
-    try {
-      const response = await api.get(`/customers/${id}`);
-      return { success: true, data: response.data };
-    } catch (error) {
-      return { 
-        success: false, 
-        error: error.response?.data?.message || 'Failed to fetch customer' 
-      };
-    }
+  getById(id) {
+    return customerCrud.get(id);
   },
 
-  // Create new customer (Admin only)
-  async create(customerData) {
-    try {
-      const response = await api.post('/customers', customerData);
-      return { success: true, data: response.data };
-    } catch (error) {
-      return { 
-        success: false, 
-        error: error.response?.data?.message || 'Failed to create customer' 
-      };
-    }
+  create(customerData) {
+    return customerCrud.create(customerData);
   },
 
-  // Update customer (Admin only)
-  async update(id, customerData) {
-    try {
-      const response = await api.put(`/customers/${id}`, customerData);
-      return { success: true, data: response.data };
-    } catch (error) {
-      return { 
-        success: false, 
-        error: error.response?.data?.message || 'Failed to update customer' 
-      };
-    }
+  update(id, customerData) {
+    return customerCrud.update(id, customerData);
   },
 
-  // Delete (deactivate) customer (Admin only)
-  async delete(id) {
-    try {
-      await api.delete(`/customers/${id}`);
-      return { success: true };
-    } catch (error) {
-      return { 
-        success: false, 
-        error: error.response?.data?.message || 'Failed to delete customer' 
-      };
-    }
+  delete(id) {
+    return customerCrud.remove(id);
   },
 
-  // Get customer's sales history
   async getSalesHistory(customerId) {
-    try {
-      const response = await api.get(`/customers/${customerId}/sales`);
-      return { success: true, data: response.data };
-    } catch (error) {
-      return { 
-        success: false, 
-        error: error.response?.data?.message || 'Failed to fetch sales history' 
-      };
-    }
-  }
+    return handleRequest(
+      () => httpClient.get(`/customers/${customerId}/sales`),
+      {
+        fallbackMessage: "Failed to fetch sales history",
+      }
+    );
+  },
 };
 
 export default customerService;
