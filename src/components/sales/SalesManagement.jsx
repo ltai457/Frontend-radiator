@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from "react";
-import { ShoppingCart, Plus } from "lucide-react";
+import { ShoppingCart, Plus, Zap } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext";
 import { useSales } from "../../hooks/useSales";
 import { useModal } from "../../hooks/useModal";
@@ -14,7 +14,9 @@ import SalesStats from "./SalesStats";
 import SaleDetailsModal from "./modals/SaleDetailsModal";
 import ReceiptModal from "./modals/ReceiptModal";
 import FastCreateSaleModal from "./modals/FastCreateSaleModal";
-const SalesManagement = () => {
+import QuickInvoiceModal from "./modals/QuickInvoiceModal";
+
+const SalesManagement = ({ onQuickInvoice }) => {
   const { user } = useAuth();
   const {
     sales,
@@ -30,6 +32,7 @@ const SalesManagement = () => {
   const createModal = useModal();
   const detailsModal = useModal();
   const receiptModal = useModal();
+  const quickInvoiceModal = useModal();
 
   // Manual filter state instead of useFilters hook
   const [filters, setFilters] = useState({
@@ -146,6 +149,16 @@ const SalesManagement = () => {
     }
   };
 
+  const handleQuickInvoiceSuccess = async (invoiceData) => {
+    console.log("Quick invoice created:", invoiceData);
+    // Show receipt immediately
+    if (invoiceData && invoiceData.invoiceNumber) {
+      receiptModal.openModal(invoiceData);
+    }
+    // The useSales hook will automatically refresh the sales list
+    quickInvoiceModal.closeModal();
+  };
+
   if (loading) {
     return <LoadingSpinner size="lg" text="Loading sales..." />;
   }
@@ -156,9 +169,19 @@ const SalesManagement = () => {
         title="Sales"
         icon={ShoppingCart}
         actions={
-          <Button onClick={() => createModal.openModal()} icon={Plus}>
-            New Sale
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={onQuickInvoice}
+              icon={Zap}
+              className="border-0 text-white bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 hover:bg-transparent focus:ring-green-500 shadow-md hover:shadow-lg"
+            >
+              Quick Invoice
+            </Button>
+            <Button onClick={() => createModal.openModal()} icon={Plus}>
+              New Sale
+            </Button>
+          </div>
         }
       />
 

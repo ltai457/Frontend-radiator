@@ -188,13 +188,13 @@ const CustomerCards = ({
       ))}
 
       {/* Debug Panel - Remove in production */}
-      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+      {/* <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
         <div className="text-xs text-gray-600">
           <strong>🔍 Debug Info:</strong> userRole = <code>{JSON.stringify(userRole)}</code>, canEdit = <code>{canEdit.toString()}</code>
           {canEdit && <span className="text-green-600 ml-2">✅ Edit buttons visible</span>}
           {!canEdit && <span className="text-red-600 ml-2">❌ Edit buttons hidden</span>}
         </div>
-      </div>
+      </div> */}
     </div>
   );
 };

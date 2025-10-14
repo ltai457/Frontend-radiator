@@ -1,9 +1,9 @@
 // src/components/dashboard/Dashboard.jsx
 import React, { useState } from 'react';
-import { 
-  LayoutDashboard, ShoppingCart, Users, Package, 
+import {
+  LayoutDashboard, ShoppingCart, Users, Package,
   Warehouse, Box, UserCog, Menu, X, LogOut,
-  TrendingUp, ChevronRight
+  TrendingUp, ChevronRight, FileText
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
@@ -12,17 +12,22 @@ import { useNavigate } from 'react-router-dom';
 import DashboardOverview from './DashboardOverview';
 import CustomerList from '../customers/CustomerList';
 import SalesManagement from '../sales/SalesManagement';
+import InvoicesManagement from '../sales/InvoicesManagement';
 import RadiatorList from '../inventory/RadiatorList';
-import WarehouseStock from '../stock/StockManagementPage';
 import WarehouseManagement from '../warehouse/WarehouseManagement';
 import StockManagement from '../stock/StockManagementPage';
 import UserManagement from '../users/UserManagement';
+import QuickInvoiceModal from '../sales/modals/QuickInvoiceModal';
+import ReceiptModal from '../sales/modals/ReceiptModal';
+import salesService from '../../api/salesService';
+import { toast } from '../../utils/toast';
 
 const TESTING_MODE = false; // Should match AuthContext
 
 const navConfig = [
   { id: 'overview', label: 'Overview', icon: LayoutDashboard, color: 'blue' },
   { id: 'sales', label: 'Sales', icon: ShoppingCart, color: 'green' },
+  { id: 'invoices', label: 'Invoices', icon: FileText, color: 'teal' },
   { id: 'customers', label: 'Customers', icon: Users, color: 'purple' },
   { id: 'inventory', label: 'Inventory', icon: Package, color: 'orange' },
   { id: 'stock', label: 'Stock Management', icon: Box, color: 'indigo' },
@@ -33,6 +38,7 @@ const getColorClasses = (color, isActive) => {
   const colors = {
     blue: isActive ? 'bg-blue-50 text-blue-700 border-blue-700' : 'text-gray-600 hover:bg-blue-50 hover:text-blue-600',
     green: isActive ? 'bg-green-50 text-green-700 border-green-700' : 'text-gray-600 hover:bg-green-50 hover:text-green-600',
+    teal: isActive ? 'bg-teal-50 text-teal-700 border-teal-700' : 'text-gray-600 hover:bg-teal-50 hover:text-teal-600',
     purple: isActive ? 'bg-purple-50 text-purple-700 border-purple-700' : 'text-gray-600 hover:bg-purple-50 hover:text-purple-600',
     orange: isActive ? 'bg-orange-50 text-orange-700 border-orange-700' : 'text-gray-600 hover:bg-orange-50 hover:text-orange-600',
     indigo: isActive ? 'bg-indigo-50 text-indigo-700 border-indigo-700' : 'text-gray-600 hover:bg-indigo-50 hover:text-indigo-600',
@@ -47,6 +53,13 @@ const Dashboard = () => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('overview');
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  
+  // Quick Invoice Modal States
+  const [showQuickInvoice, setShowQuickInvoice] = useState(false);
+  const [receiptModal, setReceiptModal] = useState({
+    isOpen: false,
+    data: null,
+  });
 
   // Detect admin (matches your logic)
   const isAdmin =
@@ -60,7 +73,8 @@ const Dashboard = () => {
   // Dynamic nav with admin section
   const navItems = [
     ...navConfig,
-    ...(isAdmin ? [{ id: 'users', label: 'User Management', icon: UserCog, color: 'red' }] : []),
+    ...(isAdmin ?
+      [{ id: 'users', label: 'User Management', icon: UserCog, color: 'red' }] : []),
   ];
 
   // Handle logout with testing mode
@@ -75,13 +89,36 @@ const Dashboard = () => {
     navigate('/login');
   };
 
+  // Handle quick invoice success
+  const handleQuickInvoiceSuccess = async (sale) => {
+    try {
+      // Fetch receipt data
+      const response = await salesService.getReceipt(sale.id);
+      if (response.success) {
+        setReceiptModal({
+          isOpen: true,
+          data: response.data,
+        });
+      }
+    } catch (err) {
+      console.error('Error fetching receipt:', err);
+      toast.error('Invoice created but failed to show receipt');
+    }
+  };
+
   // Render actual tab content
   const renderContent = () => {
     switch (activeTab) {
       case 'overview':
         return <DashboardOverview onNavigate={setActiveTab} />;
       case 'sales':
-        return <SalesManagement />;
+        return (
+          <SalesManagement
+            onQuickInvoice={() => setShowQuickInvoice(true)}
+          />
+        );
+      case 'invoices':
+        return <InvoicesManagement />;
       case 'customers':
         return <CustomerList />;
       case 'inventory':
@@ -184,7 +221,7 @@ const Dashboard = () => {
             </h1>
             <p className="text-sm text-gray-500">Manage your radiator inventory and sales</p>
           </div>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
             <div className="px-3 py-1.5 bg-green-100 text-green-700 rounded-full text-sm font-medium">
               System Online
             </div>
@@ -198,6 +235,20 @@ const Dashboard = () => {
           </div>
         </div>
       </main>
+
+      {/* Quick Invoice Modal */}
+      <QuickInvoiceModal
+        isOpen={showQuickInvoice}
+        onClose={() => setShowQuickInvoice(false)}
+        onSuccess={handleQuickInvoiceSuccess}
+      />
+
+      {/* Receipt Modal */}
+      <ReceiptModal
+        isOpen={receiptModal.isOpen}
+        onClose={() => setReceiptModal({ isOpen: false, data: null })}
+        receipt={receiptModal.data}
+      />
 
       {/* Testing Mode Info Box */}
       {TESTING_MODE && (

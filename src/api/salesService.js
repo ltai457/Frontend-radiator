@@ -67,6 +67,44 @@ const salesService = {
       }
     );
   },
+
+  // Create invoice with custom items support (for one-off customers)
+  createInvoice(invoiceData) {
+    return handleRequest(
+      () => httpClient.post("/sales/invoice", invoiceData),
+      {
+        fallbackMessage: "Failed to create invoice",
+      }
+    );
+  },
+
+  // Invoice retrieval methods
+  getAllInvoices(params) {
+    return handleRequest(
+      () => httpClient.get("/sales/invoices", { params }),
+      {
+        fallbackMessage: "Failed to fetch invoices",
+      }
+    );
+  },
+
+  getInvoiceById(id) {
+    return handleRequest(
+      () => httpClient.get(`/sales/invoices/${id}`),
+      {
+        fallbackMessage: "Failed to fetch invoice",
+      }
+    );
+  },
+
+  getInvoiceByNumber(invoiceNumber) {
+    return handleRequest(
+      () => httpClient.get(`/sales/invoices/number/${invoiceNumber}`),
+      {
+        fallbackMessage: "Failed to fetch invoice",
+      }
+    );
+  },
 };
 
 export default salesService;
